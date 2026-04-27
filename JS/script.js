@@ -1,14 +1,29 @@
 // === ARQUIVO: script.js ===
 
 // 1. COLE O SEU LINK DO GOOGLE APPS SCRIPT AQUI DENTRO DAS ASPAS:
-const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec';
+const API_URL = 'COLE_AQUI_O_SEU_LINK_QUE_TERMINA_EM_EXEC';
 
 let todosDados = [];
 let abaAtual = 'Serviço';
 
-// Função Blindada contra erros de acentuação do Windows/GitHub
+// Função para formatar a data de ISO para DD-MM-YYYY
+function formatarData(dataOriginal) {
+    if (!dataOriginal || dataOriginal === '-') return '-';
+    
+    const d = new Date(dataOriginal);
+    
+    // Verifica se a data é válida
+    if (!isNaN(d.getTime())) {
+        const dia = String(d.getUTCDate()).padStart(2, '0');
+        const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const ano = d.getUTCFullYear();
+        return `${dia}-${mes}-${ano}`;
+    }
+    
+    return dataOriginal; 
+}
+
 function obterConfigStatus(statusReal) {
-    // Remove acentos da palavra internamente para achar a cor correta
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     
     if (s.includes('aberta')) return { icone: 'fa-file-lines', classe: 'bg-aberta' };
@@ -37,10 +52,9 @@ async function buscarDados() {
         if (!response.ok) throw new Error('Erro na rede');
         
         todosDados = await response.json(); 
-        console.log(`Dados carregados: ${todosDados.length} itens.`);
         
         document.getElementById('connIndicator').className = 'status-dot online';
-        document.getElementById('connText').innerText = `Atualizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
+        document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
         
         popularFiltroStatus();
         atualizarPainel();
@@ -57,14 +71,11 @@ function atualizarPainel() {
     
     const filtrados = todosDados.filter(d => {
         const status = (d.Status || '').trim();
-        // Remove espaços e transforma em maiúsculo
         const tipoBruto = String(d.Tipo || 'SERVICO').toUpperCase().trim();
 
-        // O SEGREDO: Usamos includes() para ignorar o "Ç" 
         const ehServico = tipoBruto.includes('SERVI');
         const ehCompra = tipoBruto.includes('COMPRA');
 
-        // Ignorando o "Ç" da variável abaAtual também
         if (abaAtual.includes('Servi')) {
             const compraEntregue = (ehCompra && (status.includes('Entregue') || status.includes('Realizada')));
             return (ehServico || compraEntregue) && (filtro === 'Todos' || status === filtro);
@@ -83,7 +94,7 @@ function renderizarTabela(lista) {
     
     if(lista.length === 0) {
         head.innerHTML = '';
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:#6b7280;">Nenhum registro encontrado para esta aba.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:#6b7280;">Nenhum registro encontrado.</td></tr>';
         return;
     }
 
@@ -98,7 +109,10 @@ function renderizarTabela(lista) {
         
         const linkR = pegarValor(item, ['Link do Rastreio', 'Cód. Rastreio', 'Link Rastreio']);
         const codR = pegarValor(item, ['Cód. Rastreio', 'Codigo do Rastreio']);
-        const dataExibicao = pegarValor(item, ['Data de Abertura', 'Data']);
+        
+        // Aqui aplicamos a formatação da data solicitada
+        const dataBruta = pegarValor(item, ['Data de Abertura', 'Data']);
+        const dataFormatada = formatarData(dataBruta);
 
         let row = `<tr>
             <td><strong>${item['Nº OS'] || '-'}</strong></td>
@@ -119,7 +133,7 @@ function renderizarTabela(lista) {
             }
         }
         
-        row += `<td><i class="fa-regular fa-calendar"></i> ${dataExibicao || '-'}</td></tr>`;
+        row += `<td><i class="fa-regular fa-calendar"></i> ${dataFormatada}</td></tr>`;
         
         return row;
     }).join('');
@@ -131,7 +145,6 @@ function renderizarTabela(lista) {
 function renderizarKPIs(lista) {
     const grid = document.getElementById('kpiGrid');
     const total = lista.length;
-    // Ignorando os acentos das palavras para a contagem não falhar
     const concluidos = lista.filter(d => {
         const s = String(d.Status || '');
         return s.includes('Conclu') || s.includes('Entregue') || s.includes('Realizada');
@@ -145,7 +158,7 @@ function renderizarKPIs(lista) {
         </div>
         <div class="kpi-card" style="background: #ffffff; padding: 20px; border-radius: 10px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 15px;">
             <div class="kpi-icon" style="background: #fef3c7; color: #d97706; width: 45px; height: 45px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 20px;"><i class="fa-solid fa-spinner"></i></div>
-            <div><h3 style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Em Andamento</h3><p style="margin: 0; font-size: 24px; font-weight: bold; color: #111827;">${emAndamento}</p></div>
+            <div><h3 style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Pendente</h3><p style="margin: 0; font-size: 24px; font-weight: bold; color: #111827;">${emAndamento}</p></div>
         </div>
         <div class="kpi-card" style="background: #ffffff; padding: 20px; border-radius: 10px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 15px;">
             <div class="kpi-icon" style="background: #d1fae5; color: #10b981; width: 45px; height: 45px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 20px;"><i class="fa-solid fa-check-double"></i></div>
@@ -174,6 +187,5 @@ function mudarAba(tipo) {
     atualizarPainel();
 }
 
-// Inicia e atualiza automaticamente
 buscarDados();
 setInterval(buscarDados, 60000);
