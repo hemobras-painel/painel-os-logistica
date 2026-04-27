@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard O.S & Logística</title>
+    <title>Painel do Comissionamento</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -44,7 +44,7 @@
 
         .logo {
             padding: 24px;
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 700;
             border-bottom: 1px solid #374151;
             display: flex;
@@ -136,14 +136,14 @@
         tbody tr:hover { background-color: #f9fafb; }
         tbody tr:last-child td { border-bottom: none; }
 
-        /* Badges de Status (Cores Profissionais) */
+        /* Badges de Status */
         .badge { padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         
-        .bg-aberta { background-color: #e0e7ff; color: #3730a3; } /* Azul escuro */
-        .bg-iniciado { background-color: #fef3c7; color: #92400e; } /* Amarelo/Ouro */
-        .bg-aprovacao { background-color: #ffedd5; color: #9a3412; } /* Laranja */
-        .bg-transito { background-color: #ede9fe; color: #5b21b6; } /* Roxo */
-        .bg-concluido { background-color: #d1fae5; color: #065f46; } /* Verde Esmeralda */
+        .bg-aberta { background-color: #e0e7ff; color: #3730a3; }
+        .bg-iniciado { background-color: #fef3c7; color: #92400e; }
+        .bg-aprovacao { background-color: #ffedd5; color: #9a3412; }
+        .bg-transito { background-color: #ede9fe; color: #5b21b6; }
+        .bg-concluido { background-color: #d1fae5; color: #065f46; }
 
         .btn-rastreio {
             background-color: var(--primary);
@@ -166,7 +166,7 @@
 
     <aside class="sidebar">
         <div class="logo">
-            <i class="fa-solid fa-chart-line"></i> Painel M&C
+            <i class="fa-solid fa-clipboard-check"></i> Painel do Comissionamento
         </div>
         <div class="nav-menu">
             <button class="nav-btn active" onclick="mudarAba('Serviço')">
@@ -192,27 +192,23 @@
             </div>
         </div>
 
-        <div class="kpi-grid" id="kpiGrid">
-            </div>
+        <div class="kpi-grid" id="kpiGrid"></div>
 
         <div class="table-container">
             <table>
-                <thead id="tableHead">
-                    </thead>
-                <tbody id="tableBody">
-                    </tbody>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
     </main>
 
     <script>
-        // Link de Exportação direto da sua planilha
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/11C7D5MY0gABkOu2H_WtatlMZdy-iOiGFw6T3CkoN_2U/export?format=csv&gid=738598317';
+        // Link Oficial de Publicação (Ignora bloqueios)
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTSGGbuBgGgGmGEgjUsogpvNaVVqhNpCwTiurcTHvXm1zO8JokbLGU5H7z-o1_zPuTl_kXQrotxC4T5/pub?gid=738598317&single=true&output=csv';
 
         let todosDados = [];
         let abaAtual = 'Serviço';
 
-        // Configuração Visual dos Status (Cores e Ícones)
         const statusConfig = {
             'O.S Aberta': { icone: 'fa-file-lines', classe: 'bg-aberta' },
             'Serviço Iniciado': { icone: 'fa-person-digging', classe: 'bg-iniciado' },
@@ -225,43 +221,26 @@
             'Serviço Concluído': { icone: 'fa-flag-checkered', classe: 'bg-concluido' }
         };
 
-        // Função robusta para ler CSV (Impede que vírgulas dentro de textos quebrem a tabela)
-        function analisarCSV(texto) {
-            let p = '', linha = [''], ret = [linha], i = 0, r = 0, s = !0, l;
-            for (l of texto) {
-                if ('"' === l) {
-                    if (s && l === p) linha[i] += l;
-                    s = !s;
-                } else if (',' === l && s) l = linha[++i] = '';
-                else if ('\n' === l && s) {
-                    if ('\r' === p) linha[i] = linha[i].slice(0, -1);
-                    linha = ret[++r] = [l = '']; i = 0;
-                } else linha[i] += l;
-                p = l;
+        // Função Flexível para encontrar colunas mesmo com nomes variados
+        function pegarValor(item, nomesPossiveis) {
+            for (let nome of nomesPossiveis) {
+                const chaveReal = Object.keys(item).find(k => k.toLowerCase().trim() === nome.toLowerCase().trim());
+                if (chaveReal && item[chaveReal]) return item[chaveReal];
             }
-            return ret;
+            return '';
         }
 
         async function buscarDados() {
             try {
-                const response = await fetch(SHEET_URL);
-                if (!response.ok) throw new Error('Erro na resposta da rede');
+                // O segredo da atualização rápida: O "&t=" engana o cache do navegador e do Google
+                const urlSemCache = SHEET_URL + '&t=' + new Date().getTime();
+                const response = await fetch(urlSemCache);
                 
+                if (!response.ok) throw new Error('Erro na rede');
                 const csvText = await response.text();
                 
-                // Converter CSV blindado para JSON
-                const matriz = analisarCSV(csvText);
-                const cabecalhos = matriz[0].map(h => h.trim());
+                todosDados = analisarCSV(csvText);
                 
-                todosDados = matriz.slice(1).map(linha => {
-                    let obj = {};
-                    cabecalhos.forEach((header, i) => {
-                        if(header) obj[header] = linha[i] ? linha[i].trim() : '';
-                    });
-                    return obj;
-                }).filter(item => item['Nº OS'] && item['Nº OS'] !== ""); // Ignora linhas vazias
-
-                // Sucesso
                 document.getElementById('connIndicator').className = 'status-dot online';
                 document.getElementById('connText').innerText = `Atualizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
                 
@@ -271,38 +250,103 @@
             } catch (erro) {
                 console.error("Erro de conexão:", erro);
                 document.getElementById('connIndicator').className = 'status-dot error';
-                document.getElementById('connText').innerText = "Erro de conexão! Verifique o link e o compartilhamento.";
+                document.getElementById('connText').innerText = "Erro de conexão!";
             }
         }
 
-        function mudarAba(tipo) {
-            abaAtual = tipo;
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                if(btn.innerText.includes(tipo === 'Serviço' ? 'Ordens de Serviço' : 'Logística')) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            document.getElementById('pageTitle').innerText = tipo === 'Serviço' ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
-            atualizarPainel();
-        }
-
-        function popularFiltroStatus() {
-            const select = document.getElementById('statusFilter');
-            const statusUnicos = [...new Set(todosDados.map(d => d.Status))].filter(s => s);
-            select.innerHTML = '<option value="Todos">Todos os Status</option>';
-            statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
+        function analisarCSV(texto) {
+            let p = '', linha = [''], ret = [linha], i = 0, r = 0, s = !0, l;
+            for (l of texto) {
+                if ('"' === l) { if (s && l === p) linha[i] += l; s = !s; }
+                else if (',' === l && s) l = linha[++i] = '';
+                else if ('\n' === l && s) {
+                    if ('\r' === p) linha[i] = linha[i].slice(0, -1);
+                    linha = ret[++r] = [l = '']; i = 0;
+                } else linha[i] += l;
+                p = l;
+            }
+            const cabecalhos = ret[0].map(h => h.trim());
+            return ret.slice(1).map(linhaDados => {
+                let obj = {};
+                cabecalhos.forEach((header, index) => {
+                    if(header) obj[header] = linhaDados[index] ? linhaDados[index].trim() : '';
+                });
+                return obj;
+            }).filter(item => item['Nº OS'] || item['Status']);
         }
 
         function atualizarPainel() {
-            const filtroStatus = document.getElementById('statusFilter').value;
-            const filtrados = todosDados.filter(d => 
-                d.Tipo === abaAtual && (filtroStatus === 'Todos' || d.Status === filtroStatus)
-            );
+            const filtro = document.getElementById('statusFilter').value;
+            
+            const filtrados = todosDados.filter(d => {
+                const status = d.Status || '';
+                const tipo = d.Tipo || 'Serviço';
+
+                // INTELIGÊNCIA DE TRANSIÇÃO:
+                if (abaAtual === 'Serviço') {
+                    const ehServico = tipo === 'Serviço';
+                    const compraEntregue = (tipo === 'Compra' && (status === 'Objeto Entregue' || status === 'Compra Realizada'));
+                    return (ehServico || compraEntregue) && (filtro === 'Todos' || status === filtro);
+                }
+                
+                return tipo === 'Compra' && (filtro === 'Todos' || status === filtro);
+            });
 
             renderizarKPIs(filtrados);
             renderizarTabela(filtrados);
+        }
+
+        function renderizarTabela(lista) {
+            const head = document.getElementById('tableHead');
+            const body = document.getElementById('tableBody');
+            
+            if(lista.length === 0) {
+                head.innerHTML = '';
+                body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 40px; color:#6b7280;">Nenhum registro encontrado para esta aba.</td></tr>';
+                return;
+            }
+
+            let htmlHead = `<tr><th>Nº OS</th><th>Descrição / Local</th><th>Status</th><th>Responsável</th>`;
+            if (abaAtual === 'Compra') htmlHead += `<th>Rastreamento</th>`;
+            // Atualizado o nome da coluna aqui
+            htmlHead += `<th>Data de Abertura</th></tr>`;
+            
+            let htmlBody = lista.map(item => {
+                const conf = statusConfig[item.Status] || { icone: 'fa-circle-dot', classe: 'bg-aberta' };
+                const obs = item.Observações ? `<span class="obs-text"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
+                
+                const linkR = pegarValor(item, ['Link do Rastreio', 'Cód. Rastreio', 'Link Rastreio']);
+                const codR = pegarValor(item, ['Cód. Rastreio', 'Codigo do Rastreio']);
+                const dataExibicao = pegarValor(item, ['Data de Abertura', 'Data']);
+
+                let row = `<tr>
+                    <td><strong>${item['Nº OS'] || '-'}</strong></td>
+                    <td style="max-width: 300px;">
+                        ${item['Descrição do Serviço'] || '-'}
+                        <br><small style="color:#6b7280;"><i class="fa-solid fa-location-dot"></i> ${item.Local || ''}</small>
+                        ${obs}
+                    </td>
+                    <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status}</span></td>
+                    <td>${item.Responsável || '-'}</td>`;
+                
+                if (abaAtual === 'Compra') {
+                    const ehLink = linkR && linkR.toLowerCase().startsWith('http');
+                    if(ehLink) {
+                        row += `<td><a href="${linkR}" target="_blank" class="btn-rastreio"><i class="fa-solid fa-location-arrow"></i> Rastrear</a> <br><small style="color:#6b7280; margin-top:4px; display:block;">Cód: ${codR === linkR ? '-' : codR}</small></td>`;
+                    } else {
+                        row += `<td><span style="color:#9ca3af;">${codR || 'Aguardando Link'}</span></td>`;
+                    }
+                }
+                
+                row += `<td>
+                    <i class="fa-regular fa-calendar"></i> ${dataExibicao || '-'}
+                </td></tr>`;
+                
+                return row;
+            }).join('');
+
+            head.innerHTML = htmlHead;
+            body.innerHTML = htmlBody;
         }
 
         function renderizarKPIs(lista) {
@@ -327,57 +371,29 @@
             `;
         }
 
-        function renderizarTabela(lista) {
-            const head = document.getElementById('tableHead');
-            const body = document.getElementById('tableBody');
-            
-            if(lista.length === 0) {
-                head.innerHTML = '';
-                body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 40px; color:#6b7280;">Nenhum registro encontrado para este filtro.</td></tr>';
-                return;
-            }
-
-            let htmlHead = `<tr><th>Nº OS</th><th>Descrição / Local</th><th>Status</th><th>Responsável</th>`;
-            if (abaAtual === 'Compra') htmlHead += `<th>Rastreamento</th>`;
-            htmlHead += `<th>Prazo / Data</th></tr>`;
-            
-            let htmlBody = lista.map(item => {
-                const conf = statusConfig[item.Status] || { icone: 'fa-circle-dot', classe: 'bg-aberta' };
-                const obs = item.Observações ? `<span class="obs-text"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
-                
-                let row = `<tr>
-                    <td><strong>${item['Nº OS'] || '-'}</strong></td>
-                    <td style="max-width: 300px;">
-                        ${item['Descrição do Serviço']}
-                        <br><small style="color:#6b7280;"><i class="fa-solid fa-location-dot"></i> ${item.Local}</small>
-                        ${obs}
-                    </td>
-                    <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status}</span></td>
-                    <td>${item.Responsável}</td>`;
-                
-                if (abaAtual === 'Compra') {
-                    if(item['Link do Rastreio'] && item['Link do Rastreio'].startsWith('http')) {
-                        row += `<td><a href="${item['Link do Rastreio']}" target="_blank" class="btn-rastreio"><i class="fa-solid fa-location-crosshairs"></i> Rastrear</a> <br><small style="color:#6b7280; margin-top:4px; display:block;">Cód: ${item['Cód. Rastreio'] || '-'}</small></td>`;
-                    } else {
-                        row += `<td><span style="color:#9ca3af;">Aguardando link</span></td>`;
-                    }
-                }
-                
-                row += `<td>
-                    <i class="fa-regular fa-calendar"></i> ${item.Conclusão || item['Data de Abertura']}
-                </td></tr>`;
-                
-                return row;
-            }).join('');
-
-            head.innerHTML = htmlHead;
-            body.innerHTML = htmlBody;
+        function popularFiltroStatus() {
+            const select = document.getElementById('statusFilter');
+            const statusUnicos = [...new Set(todosDados.map(d => d.Status))].filter(s => s);
+            select.innerHTML = '<option value="Todos">Todos os Status</option>';
+            statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
         }
 
-        // Inicia a aplicação
+        function mudarAba(tipo) {
+            abaAtual = tipo;
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.innerText.includes(tipo === 'Serviço' ? 'Ordens de Serviço' : 'Logística')) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            document.getElementById('pageTitle').innerText = tipo === 'Serviço' ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
+            atualizarPainel();
+        }
+
+        // Inicia e atualiza a cada 30 segundos
         buscarDados();
-        // Atualiza os dados sozinho a cada 2 minutos
-        setInterval(buscarDados, 120000);
+        setInterval(buscarDados, 30000);
     </script>
 </body>
 </html>
