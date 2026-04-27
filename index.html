@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* CSS PREMIUM */
         :root { --bg: #f3f4f6; --side: #111827; --primary: #3b82f6; --card: #ffffff; --border: #e5e7eb; --text: #1f2937; }
         body { font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; }
         .sidebar { width: 260px; background: var(--side); color: #fff; display: flex; flex-direction: column; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
@@ -31,6 +32,7 @@
         .conn-status { padding: 15px 20px; font-size: 11px; color: #9ca3af; border-top: 1px solid #374151; }
         .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; background: #fbbf24; }
         .dot.online { background: #10b981; }
+        .dot.error { background: #ef4444; }
     </style>
 </head>
 <body>
@@ -40,7 +42,10 @@
             <button class="nav-btn active" onclick="mudarAba('Serviço')"><i class="fa-solid fa-screwdriver-wrench"></i> Ordens de Serviço</button>
             <button class="nav-btn" onclick="mudarAba('Compra')"><i class="fa-solid fa-truck-fast"></i> Logística & Compras</button>
         </div>
-        <div class="conn-status"><span id="dot" class="dot"></span> <span id="connText">Conectando...</span></div>
+        <div class="conn-status">
+            <span id="connIndicator" class="dot"></span>
+            <span id="connText">Conectando...</span>
+        </div>
     </aside>
     <main class="main-content">
         <div class="header">
@@ -55,91 +60,6 @@
         </div>
     </main>
 
-    <script>
-        // COLOQUE O SEU LINK DA ETAPA 1 AQUI:
-        const API_URL = 'SEU_LINK_AQUI_QUE_TERMINA_EM_EXEC'; 
-
-        let todosDados = [];
-        let abaAtual = 'Serviço';
-
-        const statusConfig = {
-            'O.S Aberta': { ic: 'fa-file-lines', cl: 'bg-aberta' },
-            'Serviço Iniciado': { ic: 'fa-person-digging', cl: 'bg-iniciado' },
-            'Serviço Concluído': { ic: 'fa-flag-checkered', cl: 'bg-concluido' },
-            'Objeto Entregue': { ic: 'fa-box-open', cl: 'bg-concluido' },
-            'Em Trânsito': { ic: 'fa-plane', cl: 'bg-iniciado' }
-        };
-
-        async function buscarDados() {
-            try {
-                const res = await fetch(API_URL);
-                todosDados = await res.json();
-                document.getElementById('dot').className = 'dot online';
-                document.getElementById('connText').innerText = 'Sincronizado';
-                popularFiltro();
-                atualizarPainel();
-            } catch (e) {
-                document.getElementById('connText').innerText = 'Erro na API';
-            }
-        }
-
-        function popularFiltro() {
-            const s = document.getElementById('statusFilter');
-            const sts = [...new Set(todosDados.map(d => d.Status))].filter(x => x);
-            s.innerHTML = '<option value="Todos">Todos os Status</option>';
-            sts.forEach(x => s.innerHTML += `<option value="${x}">${x}</option>`);
-        }
-
-        function atualizarPainel() {
-            const f = document.getElementById('statusFilter').value;
-            const filtrados = todosDados.filter(d => {
-                const st = d.Status || '';
-                const tp = d.Tipo || 'Serviço';
-                if (abaAtual === 'Serviço') {
-                    return (tp === 'Serviço' || st === 'Objeto Entregue') && (f === 'Todos' || st === f);
-                }
-                return tp === 'Compra' && (f === 'Todos' || st === f);
-            });
-            renderizarKPIs(filtrados);
-            renderizarTabela(filtrados);
-        }
-
-        function renderizarKPIs(lista) {
-            const c = lista.filter(d => d.Status && (d.Status.includes('Concluído') || d.Status.includes('Entregue'))).length;
-            document.getElementById('kpiGrid').innerHTML = `
-                <div class="kpi-card"><div class="kpi-icon" style="background:#e0e7ff;color:#3b82f6;"><i class="fa-solid fa-list"></i></div><div class="kpi-info"><h3>Total</h3><p>${lista.length}</p></div></div>
-                <div class="kpi-card"><div class="kpi-icon" style="background:#d1fae5;color:#10b981;"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><h3>Concluídos</h3><p>${c}</p></div></div>
-                <div class="kpi-card"><div class="kpi-icon" style="background:#fef3c7;color:#d97706;"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><h3>Pendentes</h3><p>${lista.length - c}</p></div></div>`;
-        }
-
-        function renderizarTabela(lista) {
-            let h = `<tr><th>Nº OS</th><th>Descrição</th><th>Status</th><th>Responsável</th>`;
-            if (abaAtual === 'Compra') h += `<th>Rastreio</th>`;
-            h += `<th>Data de Abertura</th></tr>`;
-            document.getElementById('tableHead').innerHTML = h;
-
-            document.getElementById('tableBody').innerHTML = lista.map(i => {
-                const cf = statusConfig[i.Status] || { ic: 'fa-circle', cl: 'bg-aberta' };
-                const link = i['Link do Rastreio'] || '';
-                let r = `<tr><td><b>${i['Nº OS'] || '-'}</b></td><td>${i['Descrição do Serviço'] || '-'}<br><small>${i.Local || ''}</small></td>
-                        <td><span class="badge ${cf.cl}"><i class="fa-solid ${cf.ic}"></i> ${i.Status}</span></td><td>${i.Responsável || '-'}</td>`;
-                if (abaAtual === 'Compra') {
-                    r += `<td>${link.startsWith('http') ? `<a href="${link}" target="_blank" class="btn-rastreio">Rastrear</a>` : i['Cód. Rastreio'] || '-'}</td>`;
-                }
-                r += `<td>${i['Data de Abertura'] || '-'}</td></tr>`;
-                return r;
-            }).join('');
-        }
-
-        function mudarAba(t) {
-            abaAtual = t;
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.innerText.includes(t === 'Serviço' ? 'Ordens' : 'Logística')));
-            document.getElementById('pageTitle').innerText = t === 'Serviço' ? 'Gestão de Serviços' : 'Gestão de Logística';
-            atualizarPainel();
-        }
-
-        buscarDados();
-        setInterval(buscarDados, 60000);
-    </script>
+    <script src="JS/script.js"></script>
 </body>
 </html>
