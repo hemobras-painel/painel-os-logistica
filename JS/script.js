@@ -1,7 +1,7 @@
 // === ARQUIVO: script.js ===
 
 // 1. COLE O SEU LINK DO GOOGLE APPS SCRIPT AQUI DENTRO DAS ASPAS:
-const API_URL = 'COLE_AQUI_O_SEU_LINK_QUE_TERMINA_EM_EXEC';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec';
 
 let todosDados = [];
 let abaAtual = 'Serviço';
