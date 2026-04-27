@@ -1,22 +1,27 @@
 // === ARQUIVO: script.js ===
 
 // 1. COLE O SEU LINK DO GOOGLE APPS SCRIPT AQUI DENTRO DAS ASPAS:
-const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec';
+const API_URL = 'COLE_AQUI_O_SEU_LINK_QUE_TERMINA_EM_EXEC';
 
 let todosDados = [];
 let abaAtual = 'Serviço';
 
-const statusConfig = {
-    'O.S Aberta': { icone: 'fa-file-lines', classe: 'bg-aberta' },
-    'Serviço Iniciado': { icone: 'fa-person-digging', classe: 'bg-iniciado' },
-    'Aguardando Aprovação': { icone: 'fa-hourglass-half', classe: 'bg-aprovacao' },
-    'Aguardando Manutenção': { icone: 'fa-wrench', classe: 'bg-aprovacao' },
-    'Aguardando Compras': { icone: 'fa-cart-shopping', classe: 'bg-aprovacao' },
-    'Compra Realizada': { icone: 'fa-check', classe: 'bg-concluido' },
-    'Em Trânsito': { icone: 'fa-plane', classe: 'bg-transito' },
-    'Objeto Entregue': { icone: 'fa-box-open', classe: 'bg-concluido' },
-    'Serviço Concluído': { icone: 'fa-flag-checkered', classe: 'bg-concluido' }
-};
+// Função Blindada contra erros de acentuação do Windows/GitHub
+function obterConfigStatus(statusReal) {
+    // Remove acentos da palavra internamente para achar a cor correta
+    const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    
+    if (s.includes('aberta')) return { icone: 'fa-file-lines', classe: 'bg-aberta' };
+    if (s.includes('iniciado')) return { icone: 'fa-person-digging', classe: 'bg-iniciado' };
+    if (s.includes('aprovacao')) return { icone: 'fa-hourglass-half', classe: 'bg-aprovacao' };
+    if (s.includes('manutencao')) return { icone: 'fa-wrench', classe: 'bg-aprovacao' };
+    if (s.includes('compras')) return { icone: 'fa-cart-shopping', classe: 'bg-aprovacao' };
+    if (s.includes('realizada')) return { icone: 'fa-check', classe: 'bg-concluido' };
+    if (s.includes('transito')) return { icone: 'fa-plane', classe: 'bg-transito' };
+    if (s.includes('entregue')) return { icone: 'fa-box-open', classe: 'bg-concluido' };
+    if (s.includes('concluido')) return { icone: 'fa-flag-checkered', classe: 'bg-concluido' };
+    return { icone: 'fa-circle-dot', classe: 'bg-aberta' };
+}
 
 function pegarValor(item, nomesPossiveis) {
     for (let nome of nomesPossiveis) {
@@ -28,12 +33,11 @@ function pegarValor(item, nomesPossiveis) {
 
 async function buscarDados() {
     try {
-        console.log("Iniciando busca de dados na API...");
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Erro na rede');
         
         todosDados = await response.json(); 
-        console.log(`Dados carregados com sucesso: ${todosDados.length} itens.`);
+        console.log(`Dados carregados: ${todosDados.length} itens.`);
         
         document.getElementById('connIndicator').className = 'status-dot online';
         document.getElementById('connText').innerText = `Atualizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
@@ -53,17 +57,20 @@ function atualizarPainel() {
     
     const filtrados = todosDados.filter(d => {
         const status = (d.Status || '').trim();
-        // Converte o Tipo para MAIÚSCULAS para ignorar erros de digitação na planilha
-        const tipo = String(d.Tipo || 'SERVIÇO').toUpperCase().trim();
+        // Remove espaços e transforma em maiúsculo
+        const tipoBruto = String(d.Tipo || 'SERVICO').toUpperCase().trim();
 
-        if (abaAtual === 'Serviço') {
-            const ehServico = tipo === 'SERVIÇO';
-            const compraEntregue = (tipo === 'COMPRA' && (status === 'Objeto Entregue' || status === 'Compra Realizada'));
+        // O SEGREDO: Usamos includes() para ignorar o "Ç" 
+        const ehServico = tipoBruto.includes('SERVI');
+        const ehCompra = tipoBruto.includes('COMPRA');
+
+        // Ignorando o "Ç" da variável abaAtual também
+        if (abaAtual.includes('Servi')) {
+            const compraEntregue = (ehCompra && (status.includes('Entregue') || status.includes('Realizada')));
             return (ehServico || compraEntregue) && (filtro === 'Todos' || status === filtro);
         }
         
-        // Aba Logística (Compra)
-        return tipo === 'COMPRA' && (filtro === 'Todos' || status === filtro);
+        return ehCompra && (filtro === 'Todos' || status === filtro);
     });
 
     renderizarKPIs(filtrados);
@@ -81,11 +88,11 @@ function renderizarTabela(lista) {
     }
 
     let htmlHead = `<tr><th>Nº OS</th><th>Descrição / Local</th><th>Status</th><th>Responsável</th>`;
-    if (abaAtual === 'Compra') htmlHead += `<th>Rastreamento</th>`;
+    if (abaAtual.includes('Compra')) htmlHead += `<th>Rastreamento</th>`;
     htmlHead += `<th>Data de Abertura</th></tr>`;
     
     let htmlBody = lista.map(item => {
-        const conf = statusConfig[item.Status] || { icone: 'fa-circle-dot', classe: 'bg-aberta' };
+        const conf = obterConfigStatus(item.Status);
         
         const obs = item.Observações ? `<span class="obs-text" style="display:block; font-size:12px; color:#ef4444; margin-top:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
         
@@ -100,10 +107,10 @@ function renderizarTabela(lista) {
                 <br><small style="color:#6b7280;"><i class="fa-solid fa-location-dot"></i> ${item.Local || ''}</small>
                 ${obs}
             </td>
-            <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status}</span></td>
+            <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'O.S Aberta'}</span></td>
             <td>${item.Responsável || '-'}</td>`;
         
-        if (abaAtual === 'Compra') {
+        if (abaAtual.includes('Compra')) {
             const ehLink = linkR && String(linkR).toLowerCase().startsWith('http');
             if(ehLink) {
                 row += `<td><a href="${linkR}" target="_blank" class="btn-rastreio" style="background-color: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none;"><i class="fa-solid fa-location-arrow"></i> Rastrear</a> <br><small style="color:#6b7280; margin-top:4px; display:block;">Cód: ${codR === linkR ? '-' : codR}</small></td>`;
@@ -112,9 +119,7 @@ function renderizarTabela(lista) {
             }
         }
         
-        row += `<td>
-            <i class="fa-regular fa-calendar"></i> ${dataExibicao || '-'}
-        </td></tr>`;
+        row += `<td><i class="fa-regular fa-calendar"></i> ${dataExibicao || '-'}</td></tr>`;
         
         return row;
     }).join('');
@@ -126,7 +131,11 @@ function renderizarTabela(lista) {
 function renderizarKPIs(lista) {
     const grid = document.getElementById('kpiGrid');
     const total = lista.length;
-    const concluidos = lista.filter(d => d.Status === 'Serviço Concluído' || d.Status === 'Objeto Entregue' || d.Status === 'Compra Realizada').length;
+    // Ignorando os acentos das palavras para a contagem não falhar
+    const concluidos = lista.filter(d => {
+        const s = String(d.Status || '');
+        return s.includes('Conclu') || s.includes('Entregue') || s.includes('Realizada');
+    }).length;
     const emAndamento = total - concluidos;
 
     grid.innerHTML = `
@@ -155,16 +164,16 @@ function popularFiltroStatus() {
 function mudarAba(tipo) {
     abaAtual = tipo;
     document.querySelectorAll('.nav-btn').forEach(btn => {
-        if(btn.innerText.includes(tipo === 'Serviço' ? 'Ordens' : 'Logística')) {
+        if(btn.innerText.includes(tipo.includes('Servi') ? 'Ordens' : 'Logística')) {
             btn.classList.add('active');
         } else {
             btn.classList.remove('active');
         }
     });
-    document.getElementById('pageTitle').innerText = tipo === 'Serviço' ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
+    document.getElementById('pageTitle').innerText = tipo.includes('Servi') ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
     atualizarPainel();
 }
 
-// Inicia e atualiza a cada 60 segundos automaticamente
+// Inicia e atualiza automaticamente
 buscarDados();
 setInterval(buscarDados, 60000);
