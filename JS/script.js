@@ -1,5 +1,5 @@
 // ATENÇÃO: Substitua o link abaixo pelo link que você copiou do Google (URL do App da Web)
-const API_URL = 'https://script.google.com/macros/s/AKfycbzXOzVUhEvmngwbwQ3BMbYEMj8YG6a_rNPhTpM7obfDS_hbih6lmRG9tE4uPOIvD9r5rg/exec'; 
+const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec'; 
 
 let todosDados = [];
 let abaAtual = 'Serviço';
