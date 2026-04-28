@@ -29,7 +29,7 @@ function obterConfigStatus(statusReal) {
     if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-plane', classe: 'bg-transito' };
     if (s.includes('entregue') || s.includes('recebido')) return { icone: 'fa-box-open', classe: 'bg-concluido' };
     if (s.includes('concluido')) return { icone: 'fa-flag-checkered', classe: 'bg-concluido' };
-    return { icone: 'fa-circle-dot', classe: 'bg-aberta' }; // Padrão
+    return { icone: 'fa-circle-dot', classe: 'bg-aberta' };
 }
 
 function pegarValor(item, nomesPossiveis) {
@@ -60,7 +60,6 @@ function atualizarPainel() {
     const filtro = document.getElementById('statusFilter').value;
     const filtrados = todosDados.filter(d => {
         const status = (d.Status || '').trim();
-        // Agora nós olhamos a "AbaOrigem" que o Google Sheets nos enviou!
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
 
         let pertenceAAba = false;
@@ -92,7 +91,7 @@ function renderizarTabela(lista) {
     let htmlBody = '';
 
     // ==========================================
-    // DESENHA A TABELA DE ORDEM DE SERVIÇO
+    // TABELA DE ORDEM DE SERVIÇO
     // ==========================================
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr>
@@ -114,9 +113,30 @@ function renderizarTabela(lista) {
             const dataAbertura = formatarData(pegarValor(item, ['Data de Abertura', 'Data']));
             const dataConclusao = formatarData(pegarValor(item, ['Data de Conclusão', 'Conclusão', 'Data Fim']));
 
+            const numeroOS = String(item['Nº OS'] || item['Nº'] || '').trim();
+
+            // INTELIGÊNCIA DE VÍNCULO: Procura se existe alguma compra para essa OS
+            const comprasVinculadas = todosDados.filter(d => {
+                const abaPlanilha = String(d.AbaOrigem || '').toUpperCase();
+                if (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA')) {
+                    const osDestaCompra = String(pegarValor(d, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço'])).trim();
+                    return osDestaCompra === numeroOS && numeroOS !== '';
+                }
+                return false;
+            });
+
+            // Se achar, cria o selo azul
+            let badgeVinculo = '';
+            if (comprasVinculadas.length > 0) {
+                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#eff6ff; color:#2563eb; padding:3px 6px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 500;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
+            }
+
             return `<tr>
-                <td><strong>${item['Nº OS'] || item['Nº'] || '-'}</strong></td>
-                <td style="max-width: 200px;">
+                <td style="vertical-align: top;">
+                    <strong>${numeroOS || '-'}</strong>
+                    ${badgeVinculo}
+                </td>
+                <td style="max-width: 200px; vertical-align: top;">
                     ${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}
                     <br><small style="color:#6b7280;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
                     ${obs}
@@ -131,11 +151,11 @@ function renderizarTabela(lista) {
         }).join('');
     } 
     // ==========================================
-    // DESENHA A TABELA DE COMPRAS / LOGÍSTICA
+    // TABELA DE COMPRAS / LOGÍSTICA
     // ==========================================
     else {
         htmlHead = `<tr>
-            <th>Nº</th>
+            <th>Nº / Ref.</th>
             <th>Item / Detalhes</th>
             <th>Fabricante</th>
             <th>Status</th>
@@ -147,6 +167,9 @@ function renderizarTabela(lista) {
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
             
+            const numeroCompra = item['Nº'] || item['Nº OS'] || '-';
+            const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
+            
             const descricao = pegarValor(item, ['Descrição do item', 'Descrição']);
             const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtd']);
             const tag = pegarValor(item, ['TAG']);
@@ -156,9 +179,18 @@ function renderizarTabela(lista) {
             const previsao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão']));
             const entregue = formatarData(pegarValor(item, ['Data Entregue', 'Entregue']));
 
+            // Selo cinza indicando de qual O.S esse item é
+            let badgeRef = '';
+            if (osVinculada) {
+                badgeRef = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#f3f4f6; color:#4b5563; padding:3px 6px; border-radius:4px; font-weight: 500;"><i class="fa-solid fa-link"></i> Ref: OS ${osVinculada}</span></div>`;
+            }
+
             return `<tr>
-                <td><strong>${item['Nº'] || item['Nº OS'] || '-'}</strong></td>
-                <td style="max-width: 250px;">
+                <td style="vertical-align: top;">
+                    <strong>${numeroCompra}</strong>
+                    ${badgeRef}
+                </td>
+                <td style="max-width: 250px; vertical-align: top;">
                     <span style="font-weight: 500;">${descricao || '-'}</span>
                     <br><small style="color:#6b7280;"><b>Qtd:</b> ${qtd || '-'} &nbsp;|&nbsp; <b>TAG:</b> ${tag || '-'}</small>
                 </td>
@@ -202,7 +234,6 @@ function renderizarKPIs(lista) {
 
 function popularFiltroStatus() {
     const select = document.getElementById('statusFilter');
-    // Coleta apenas os status da aba que está aberta no momento
     const filtradosAba = todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
         if (abaAtual.includes('Servi')) return abaPlanilha.includes('SERVI');
@@ -225,7 +256,7 @@ function mudarAba(tipo) {
     });
     document.getElementById('pageTitle').innerText = tipo.includes('Servi') ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
     
-    popularFiltroStatus(); // Atualiza a caixinha de filtro baseada na aba
+    popularFiltroStatus(); 
     atualizarPainel();
 }
 
