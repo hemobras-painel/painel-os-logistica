@@ -13,7 +13,7 @@ function formatarData(dataOriginal) {
         const dia = String(d.getUTCDate()).padStart(2, '0');
         const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
         const ano = d.getUTCFullYear();
-        return `${dia}-${mes}-${ano}`;
+        return `${dia}/${mes}/${ano}`; // Usando barra para ficar mais compacto
     }
     return dataOriginal; 
 }
@@ -91,7 +91,7 @@ function renderizarTabela(lista) {
     let htmlBody = '';
 
     // ==========================================
-    // TABELA DE ORDEM DE SERVIÇO
+    // TABELA DE ORDEM DE SERVIÇO (MANTIDA INTACTA)
     // ==========================================
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr>
@@ -115,7 +115,6 @@ function renderizarTabela(lista) {
 
             const numeroOS = String(item['Nº OS'] || item['Nº'] || '').trim();
 
-            // INTELIGÊNCIA DE VÍNCULO: Procura se existe alguma compra para essa OS
             const comprasVinculadas = todosDados.filter(d => {
                 const abaPlanilha = String(d.AbaOrigem || '').toUpperCase();
                 if (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA')) {
@@ -125,14 +124,13 @@ function renderizarTabela(lista) {
                 return false;
             });
 
-            // Se achar, cria o selo azul
             let badgeVinculo = '';
             if (comprasVinculadas.length > 0) {
                 badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#eff6ff; color:#2563eb; padding:3px 6px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 500;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
             }
 
             return `<tr>
-                <td style="vertical-align: top;">
+                <td style="vertical-align: top; width: 120px;">
                     <strong>${numeroOS || '-'}</strong>
                     ${badgeVinculo}
                 </td>
@@ -143,62 +141,78 @@ function renderizarTabela(lista) {
                 </td>
                 <td><span style="font-size: 11px; font-weight: 500; color: #4b5563; background: #f3f4f6; padding: 3px 6px; border-radius: 4px;">${sistema || 'N/A'}</span></td>
                 <td><span class="badge ${conf.classe}" style="font-size: 10px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Aberto'}</span></td>
-                <td style="font-size: 13px;">${item.Responsável || '-'}</td>
-                <td style="font-size: 13px; font-weight: 500;">${equipe || '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap;"><i class="fa-regular fa-calendar" style="font-size: 10px;"></i> ${dataAbertura}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 500;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle" style="font-size: 10px;"></i> ${dataConclusao}` : '-'}</td>
+                <td style="font-size: 12px;">${item.Responsável || '-'}</td>
+                <td style="font-size: 12px; font-weight: 500;">${equipe || '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 500;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
             </tr>`;
         }).join('');
     } 
     // ==========================================
-    // TABELA DE COMPRAS / LOGÍSTICA
+    // TABELA DE COMPRAS / LOGÍSTICA (NOVO DESIGN COMPACTO)
     // ==========================================
     else {
         htmlHead = `<tr>
-            <th>Nº / Ref.</th>
-            <th>Item / Detalhes</th>
-            <th>Fabricante</th>
-            <th>Status</th>
+            <th style="min-width: 90px;">Nº / Status</th>
+            <th style="min-width: 180px;">Descrição do Item</th>
+            <th>Qtd</th>
+            <th>Prioridade</th>
             <th>Solicitante</th>
-            <th>Previsão Entrega</th>
-            <th>Data Entregue</th>
+            <th title="Data de Solicitação">Solicitado</th>
+            <th title="Data de Cotação enviada a HB">Cotação HB</th>
+            <th title="Aprovado HB">Aprovado</th>
+            <th title="Previsão de entrega">Previsão</th>
+            <th title="Data de entrega no Site">Entregue</th>
         </tr>`;
 
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
             
+            // Dados Básicos
             const numeroCompra = item['Nº'] || item['Nº OS'] || '-';
-            const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
-            
             const descricao = pegarValor(item, ['Descrição do item', 'Descrição']);
-            const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtd']);
-            const tag = pegarValor(item, ['TAG']);
-            const fabricante = pegarValor(item, ['Fabricante']);
+            const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd']);
+            const prioridade = pegarValor(item, ['Prioridade (alta/média/baixa)', 'Prioridade']);
             const solicitante = pegarValor(item, ['Solicitante']);
             
-            const previsao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão']));
-            const entregue = formatarData(pegarValor(item, ['Data Entregue', 'Entregue']));
+            // Datas formatadas
+            const dtSolicitado = formatarData(pegarValor(item, ['Solicitado? Data', 'Data de solicitação', 'Data Solicitação']));
+            const dtCotacao = formatarData(pegarValor(item, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB', 'Cotação enviada HB']));
+            const dtAprovado = formatarData(pegarValor(item, ['Aprovado HB? Data', 'Aprovado HB']));
+            const dtPrevisao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão de entrega', 'Previsão']));
+            const dtEntregue = formatarData(pegarValor(item, ['Data Entregue', 'Data de entrega no Site', 'Entregue']));
 
-            // Selo cinza indicando de qual O.S esse item é
-            let badgeRef = '';
-            if (osVinculada) {
-                badgeRef = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#f3f4f6; color:#4b5563; padding:3px 6px; border-radius:4px; font-weight: 500;"><i class="fa-solid fa-link"></i> Ref: OS ${osVinculada}</span></div>`;
-            }
+            // Configuração visual da Etiqueta de Prioridade
+            let corPrioridade = '#6b7280'; 
+            let bgPrioridade = '#f3f4f6';
+            if(prioridade.toLowerCase().includes('alta')) { corPrioridade = '#b91c1c'; bgPrioridade = '#fee2e2'; }
+            else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#b45309'; bgPrioridade = '#fef3c7'; }
+            else if(prioridade.toLowerCase().includes('baix')) { corPrioridade = '#047857'; bgPrioridade = '#d1fae5'; }
+
+            const pillPrioridade = prioridade ? `<span style="font-size: 10px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 3px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap;">${prioridade.toUpperCase()}</span>` : '-';
+
+            // O Vínculo da OS (Se existir)
+            const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
+            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:9px; background:#f3f4f6; color:#4b5563; padding:2px 4px; border-radius:4px; font-weight: 600;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
 
             return `<tr>
                 <td style="vertical-align: top;">
-                    <strong>${numeroCompra}</strong>
+                    <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${numeroCompra}</div>
+                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Cotação'}</span>
                     ${badgeRef}
                 </td>
-                <td style="max-width: 250px; vertical-align: top;">
-                    <span style="font-weight: 500;">${descricao || '-'}</span>
-                    <br><small style="color:#6b7280;"><b>Qtd:</b> ${qtd || '-'} &nbsp;|&nbsp; <b>TAG:</b> ${tag || '-'}</small>
+                <td style="font-size: 12px; vertical-align: top; max-width: 220px;">
+                    ${descricao || '-'}
                 </td>
-                <td style="font-size: 13px;">${fabricante || '-'}</td>
-                <td><span class="badge ${conf.classe}" style="font-size: 10px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Em Cotação'}</span></td>
-                <td style="font-size: 13px;">${solicitante || '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap;"><i class="fa-regular fa-calendar" style="font-size: 10px;"></i> ${previsao}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 500;">${entregue !== '-' ? `<i class="fa-solid fa-box-open" style="font-size: 10px;"></i> ${entregue}` : '-'}</td>
+                <td style="font-size: 13px; font-weight: 600; text-align: center;">${qtd || '-'}</td>
+                <td style="vertical-align: middle;">${pillPrioridade}</td>
+                <td style="font-size: 12px;">${solicitante || '-'}</td>
+                
+                <td style="font-size: 11px; white-space: nowrap; color: #4b5563;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #4b5563;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #0284c7;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #d97706;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
             </tr>`;
         }).join('');
     }
