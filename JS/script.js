@@ -13,22 +13,25 @@ function formatarData(dataOriginal) {
         const dia = String(d.getUTCDate()).padStart(2, '0');
         const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
         const ano = d.getUTCFullYear();
-        return `${dia}/${mes}/${ano}`; // Usando barra para ficar mais compacto
+        return `${dia}/${mes}/${ano}`;
     }
     return dataOriginal; 
 }
 
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    
+    // Status exatos e aproximados
     if (s.includes('aberta')) return { icone: 'fa-file-lines', classe: 'bg-aberta' };
     if (s.includes('iniciado')) return { icone: 'fa-person-digging', classe: 'bg-iniciado' };
     if (s.includes('aprovacao') || s.includes('cotacao') || s.includes('aguardando')) return { icone: 'fa-hourglass-half', classe: 'bg-aprovacao' };
     if (s.includes('manutencao')) return { icone: 'fa-wrench', classe: 'bg-aprovacao' };
     if (s.includes('compras')) return { icone: 'fa-cart-shopping', classe: 'bg-aprovacao' };
-    if (s.includes('realizada') || s.includes('aprovado')) return { icone: 'fa-check', classe: 'bg-concluido' };
-    if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-plane', classe: 'bg-transito' };
+    if (s.includes('realizada') || s.includes('aprovado') || s.includes('aprovado hb')) return { icone: 'fa-check', classe: 'bg-concluido' };
+    if (s.includes('transito') || s.includes('em transito') || s.includes('enviada')) return { icone: 'fa-plane', classe: 'bg-transito' };
     if (s.includes('entregue') || s.includes('recebido')) return { icone: 'fa-box-open', classe: 'bg-concluido' };
     if (s.includes('concluido')) return { icone: 'fa-flag-checkered', classe: 'bg-concluido' };
+    
     return { icone: 'fa-circle-dot', classe: 'bg-aberta' };
 }
 
@@ -40,13 +43,23 @@ function pegarValor(item, nomesPossiveis) {
     return '';
 }
 
+// NOVO: Função para o botão manual girar e dar feedback visual
+async function forcarSincronizacao() {
+    const icon = document.getElementById('syncIcon');
+    icon.classList.add('fa-spin'); // Faz a setinha girar
+    await buscarDados();
+    icon.classList.remove('fa-spin'); // Para de girar
+}
+
 async function buscarDados() {
     try {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Erro na rede');
         todosDados = await response.json(); 
+        
         document.getElementById('connIndicator').className = 'status-dot online';
         document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
+        
         popularFiltroStatus();
         atualizarPainel();
     } catch (erro) {
@@ -63,7 +76,6 @@ function atualizarPainel() {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
 
         let pertenceAAba = false;
-        
         if (abaAtual.includes('Servi') && abaPlanilha.includes('SERVI')) {
             pertenceAAba = true;
         } else if (abaAtual.includes('Compra') && (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA'))) {
@@ -81,9 +93,14 @@ function renderizarTabela(lista) {
     const head = document.getElementById('tableHead');
     const body = document.getElementById('tableBody');
     
+    // Animação de Fade-in sempre que a tabela redesenhar
+    body.classList.remove('animate-fade');
+    void body.offsetWidth; // Truque do JS para reiniciar a animação
+    body.classList.add('animate-fade');
+    
     if(lista.length === 0) {
         head.innerHTML = '';
-        body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:#6b7280;">Nenhum registro encontrado nesta aba.</td></tr>';
+        body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:#64748b; font-weight: 500;">Nenhum registro encontrado nesta aba.</td></tr>';
         return;
     }
 
@@ -91,7 +108,7 @@ function renderizarTabela(lista) {
     let htmlBody = '';
 
     // ==========================================
-    // TABELA DE ORDEM DE SERVIÇO (MANTIDA INTACTA)
+    // TABELA DE ORDEM DE SERVIÇO
     // ==========================================
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr>
@@ -126,7 +143,7 @@ function renderizarTabela(lista) {
 
             let badgeVinculo = '';
             if (comprasVinculadas.length > 0) {
-                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#eff6ff; color:#2563eb; padding:3px 6px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 500;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
+                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#eff6ff; color:#2563eb; padding:3px 6px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
             }
 
             return `<tr>
@@ -136,20 +153,20 @@ function renderizarTabela(lista) {
                 </td>
                 <td style="max-width: 200px; vertical-align: top;">
                     ${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}
-                    <br><small style="color:#6b7280;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
+                    <br><small style="color:#64748b;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
                     ${obs}
                 </td>
-                <td><span style="font-size: 11px; font-weight: 500; color: #4b5563; background: #f3f4f6; padding: 3px 6px; border-radius: 4px;">${sistema || 'N/A'}</span></td>
+                <td><span style="font-size: 11px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 4px 8px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
                 <td><span class="badge ${conf.classe}" style="font-size: 10px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Aberto'}</span></td>
-                <td style="font-size: 12px;">${item.Responsável || '-'}</td>
-                <td style="font-size: 12px; font-weight: 500;">${equipe || '-'}</td>
-                <td style="font-size: 11px; white-space: nowrap;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
-                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 500;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
+                <td style="font-size: 13px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
+                <td style="font-size: 13px; font-weight: 500; color: #334155;">${equipe || '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #64748b;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
             </tr>`;
         }).join('');
     } 
     // ==========================================
-    // TABELA DE COMPRAS / LOGÍSTICA (NOVO DESIGN COMPACTO)
+    // TABELA DE COMPRAS / LOGÍSTICA
     // ==========================================
     else {
         htmlHead = `<tr>
@@ -168,51 +185,46 @@ function renderizarTabela(lista) {
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
             
-            // Dados Básicos
             const numeroCompra = item['Nº'] || item['Nº OS'] || '-';
             const descricao = pegarValor(item, ['Descrição do item', 'Descrição']);
             const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd']);
             const prioridade = pegarValor(item, ['Prioridade (alta/média/baixa)', 'Prioridade']);
             const solicitante = pegarValor(item, ['Solicitante']);
             
-            // Datas formatadas
             const dtSolicitado = formatarData(pegarValor(item, ['Solicitado? Data', 'Data de solicitação', 'Data Solicitação']));
             const dtCotacao = formatarData(pegarValor(item, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB', 'Cotação enviada HB']));
             const dtAprovado = formatarData(pegarValor(item, ['Aprovado HB? Data', 'Aprovado HB']));
             const dtPrevisao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão de entrega', 'Previsão']));
             const dtEntregue = formatarData(pegarValor(item, ['Data Entregue', 'Data de entrega no Site', 'Entregue']));
 
-            // Configuração visual da Etiqueta de Prioridade
-            let corPrioridade = '#6b7280'; 
-            let bgPrioridade = '#f3f4f6';
-            if(prioridade.toLowerCase().includes('alta')) { corPrioridade = '#b91c1c'; bgPrioridade = '#fee2e2'; }
-            else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#b45309'; bgPrioridade = '#fef3c7'; }
-            else if(prioridade.toLowerCase().includes('baix')) { corPrioridade = '#047857'; bgPrioridade = '#d1fae5'; }
+            let corPrioridade = '#64748b'; let bgPrioridade = '#f1f5f9';
+            if(prioridade.toLowerCase().includes('alta')) { corPrioridade = '#dc2626'; bgPrioridade = '#fef2f2'; }
+            else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#d97706'; bgPrioridade = '#fffbeb'; }
+            else if(prioridade.toLowerCase().includes('baix')) { corPrioridade = '#059669'; bgPrioridade = '#ecfdf5'; }
 
-            const pillPrioridade = prioridade ? `<span style="font-size: 10px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 3px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap;">${prioridade.toUpperCase()}</span>` : '-';
+            const pillPrioridade = prioridade ? `<span style="font-size: 10px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 4px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; border: 1px solid ${corPrioridade}30;">${prioridade.toUpperCase()}</span>` : '-';
 
-            // O Vínculo da OS (Se existir)
             const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
-            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:9px; background:#f3f4f6; color:#4b5563; padding:2px 4px; border-radius:4px; font-weight: 600;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
+            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:9px; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
 
             return `<tr>
                 <td style="vertical-align: top;">
-                    <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${numeroCompra}</div>
-                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Cotação'}</span>
+                    <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #0f172a;">${numeroCompra}</div>
+                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 3px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Cotação'}</span>
                     ${badgeRef}
                 </td>
-                <td style="font-size: 12px; vertical-align: top; max-width: 220px;">
+                <td style="font-size: 13px; vertical-align: top; max-width: 220px; color: #334155;">
                     ${descricao || '-'}
                 </td>
-                <td style="font-size: 13px; font-weight: 600; text-align: center;">${qtd || '-'}</td>
+                <td style="font-size: 14px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
                 <td style="vertical-align: middle;">${pillPrioridade}</td>
-                <td style="font-size: 12px;">${solicitante || '-'}</td>
+                <td style="font-size: 13px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
                 
-                <td style="font-size: 11px; white-space: nowrap; color: #4b5563;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
-                <td style="font-size: 11px; white-space: nowrap; color: #4b5563;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
-                <td style="font-size: 11px; white-space: nowrap; color: #0284c7;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
-                <td style="font-size: 11px; white-space: nowrap; color: #d97706;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
-                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #64748b;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #64748b;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
+                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
             </tr>`;
         }).join('');
     }
@@ -225,29 +237,31 @@ function renderizarKPIs(lista) {
     const grid = document.getElementById('kpiGrid');
     const total = lista.length;
     const concluidos = lista.filter(d => {
-        const s = String(d.Status || '');
-        return s.includes('Conclu') || s.includes('Entregue') || s.includes('Realizada') || s.includes('Aprovado');
+        const s = String(d.Status || '').toLowerCase();
+        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado hb');
     }).length;
     const emAndamento = total - concluidos;
 
     grid.innerHTML = `
-        <div class="kpi-card" style="padding: 15px;">
-            <div class="kpi-icon" style="background: #e0e7ff; color: #3b82f6; width: 40px; height: 40px; font-size: 18px;"><i class="fa-solid fa-layer-group"></i></div>
-            <div><h3 style="font-size: 11px;">Total</h3><p style="font-size: 22px;">${total}</p></div>
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div>
+            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${total}</p></div>
         </div>
-        <div class="kpi-card" style="padding: 15px;">
-            <div class="kpi-icon" style="background: #fef3c7; color: #d97706; width: 40px; height: 40px; font-size: 18px;"><i class="fa-solid fa-spinner"></i></div>
-            <div><h3 style="font-size: 11px;">Pendente / Em Andamento</h3><p style="font-size: 22px;">${emAndamento}</p></div>
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div>
+            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
         </div>
-        <div class="kpi-card" style="padding: 15px;">
-            <div class="kpi-icon" style="background: #d1fae5; color: #10b981; width: 40px; height: 40px; font-size: 18px;"><i class="fa-solid fa-check-double"></i></div>
-            <div><h3 style="font-size: 11px;">Finalizados / Entregues</h3><p style="font-size: 22px;">${concluidos}</p></div>
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div>
+            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
         </div>
     `;
 }
 
 function popularFiltroStatus() {
     const select = document.getElementById('statusFilter');
+    const valorAtual = select.value; // SALVA A ESCOLHA DO USUÁRIO
+
     const filtradosAba = todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
         if (abaAtual.includes('Servi')) return abaPlanilha.includes('SERVI');
@@ -257,6 +271,11 @@ function popularFiltroStatus() {
     
     select.innerHTML = '<option value="Todos">Todos os Status</option>';
     statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
+
+    // DEVOLVE A ESCOLHA PARA A CAIXINHA
+    if(statusUnicos.includes(valorAtual)) {
+        select.value = valorAtual;
+    }
 }
 
 function mudarAba(tipo) {
@@ -270,9 +289,13 @@ function mudarAba(tipo) {
     });
     document.getElementById('pageTitle').innerText = tipo.includes('Servi') ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
     
+    // Reseta o filtro sempre que mudar de aba
+    document.getElementById('statusFilter').value = 'Todos'; 
+    
     popularFiltroStatus(); 
     atualizarPainel();
 }
 
+// Mantemos o timer rodando para ninguém ter painel desatualizado, mas agora ele não quebra o filtro!
 buscarDados();
 setInterval(buscarDados, 60000);
