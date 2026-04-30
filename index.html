@@ -7,8 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="CSS/style.css">
-    <!-- NOVO: Biblioteca de Gráficos Chart.js -->
+    
+    <!-- Biblioteca de Gráficos Chart.js e o Plugin de Textos (DataLabels) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 </head>
 <body>
     <aside class="sidebar">
@@ -37,7 +39,6 @@
         
         <div class="kpi-grid" id="kpiGrid"></div>
 
-        <!-- NOVO: Área dos Gráficos -->
         <div class="charts-grid" id="chartsContainer">
             <div class="chart-card">
                 <h3><i class="fa-solid fa-chart-pie" style="color: #3b82f6;"></i> Gargalos da Operação (Por Status)</h3>

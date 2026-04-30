@@ -1,14 +1,15 @@
 // === ARQUIVO: script.js ===
 
 // 1. O SEU LINK DO GOOGLE APPS SCRIPT:
-const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec';
+const API_URL = 'COLE_AQUI_O_SEU_LINK_QUE_TERMINA_EM_EXEC';
 
 let todosDados = [];
 let abaAtual = 'Serviço';
-
-// Variáveis para guardar os gráficos na memória e atualizá-los sem piscar a tela
 let chartStatusInstancia = null;
 let chartBarInstancia = null;
+
+// Registra o Plugin de Rótulos de Dados para os gráficos
+Chart.register(ChartDataLabels);
 
 function formatarData(dataOriginal) {
     if (!dataOriginal || dataOriginal === '-' || String(dataOriginal).trim() === '') return '-';
@@ -55,10 +56,8 @@ async function buscarDados() {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Erro na rede');
         todosDados = await response.json(); 
-        
         document.getElementById('connIndicator').className = 'status-dot online';
         document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
-        
         popularFiltroStatus();
         atualizarPainel();
     } catch (erro) {
@@ -85,26 +84,24 @@ function atualizarPainel() {
     });
     
     renderizarKPIs(filtrados);
-    renderizarGraficos(filtrados); // <--- Chama os gráficos novos!
+    renderizarGraficos(filtrados);
     renderizarTabela(filtrados);
 }
 
-// === MOTOR DE GRÁFICOS (NOVO) ===
 function renderizarGraficos(lista) {
-    // 1. Filtramos apenas o que NÃO está concluído (Isso revela os atrasos)
     const pendentes = lista.filter(d => {
         const s = String(d.Status || '').toLowerCase();
         return !(s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado hb'));
     });
 
     if (pendentes.length === 0) {
-        document.getElementById('chartsContainer').style.display = 'none'; // Esconde se tudo estiver perfeito
+        document.getElementById('chartsContainer').style.display = 'none';
         return;
     } else {
         document.getElementById('chartsContainer').style.display = 'grid';
     }
 
-    // --- Lógica Gráfico 1: Gargalos por Status ---
+    // --- Gráfico 1: Rosca (Status) ---
     const contagemStatus = {};
     pendentes.forEach(d => {
         const s = d.Status || 'Sem Status';
@@ -112,7 +109,7 @@ function renderizarGraficos(lista) {
     });
 
     const ctxStatus = document.getElementById('chartStatus').getContext('2d');
-    if (chartStatusInstancia) chartStatusInstancia.destroy(); // Apaga o gráfico velho antes de desenhar o novo
+    if (chartStatusInstancia) chartStatusInstancia.destroy();
 
     chartStatusInstancia = new Chart(ctxStatus, {
         type: 'doughnut',
@@ -121,17 +118,24 @@ function renderizarGraficos(lista) {
             datasets: [{
                 data: Object.values(contagemStatus),
                 backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'],
-                borderWidth: 2,
-                hoverOffset: 4
+                borderWidth: 2, hoverOffset: 4
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } } }
+            plugins: { 
+                legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } },
+                // ADICIONADO: Configuração dos Números na Rosca
+                datalabels: {
+                    color: '#ffffff',
+                    font: { weight: 'bold', size: 14, family: 'Inter' },
+                    formatter: (value) => value > 0 ? value : '' // Só mostra se tiver mais de 0
+                }
+            }
         }
     });
 
-    // --- Lógica Gráfico 2: Pendências por Prioridade (Compras) ou Equipe (OS) ---
+    // --- Gráfico 2: Barras (Prioridade ou Equipe) ---
     const contagemBarra = {};
     let labelBarra = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Equipe Técnica';
     document.getElementById('chartTitleBar').innerText = labelBarra;
@@ -149,13 +153,15 @@ function renderizarGraficos(lista) {
     const labelsBarra = Object.keys(contagemBarra);
     const dadosBarra = labelsBarra.map(l => contagemBarra[l]);
 
-    // Inteligência de Cores para as barras de Prioridade
     const coresBarra = labelsBarra.map(l => {
-        if(l.includes('ALTA')) return '#ef4444'; // Vermelho
-        if(l.includes('MÉD')) return '#f59e0b'; // Amarelo
-        if(l.includes('BAIXA')) return '#10b981'; // Verde
-        return '#3b82f6'; // Azul Padrão
+        if(l.includes('ALTA')) return '#ef4444';
+        if(l.includes('MÉD')) return '#f59e0b';
+        if(l.includes('BAIXA')) return '#10b981';
+        return '#3b82f6'; 
     });
+
+    // Acha o maior número para dar um respiro no topo do gráfico
+    const maxVal = Math.max(...dadosBarra, 0) + 2; 
 
     const ctxBar = document.getElementById('chartBar').getContext('2d');
     if (chartBarInstancia) chartBarInstancia.destroy();
@@ -168,8 +174,21 @@ function renderizarGraficos(lista) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+            plugins: { 
+                legend: { display: false },
+                // ADICIONADO: Configuração dos Números nas Barras
+                datalabels: {
+                    color: '#0f172a', // Cor escura para leitura fácil
+                    anchor: 'end',    // Ancorado no topo da barra
+                    align: 'top',     // Alinhado para cima
+                    font: { weight: 'bold', size: 13, family: 'Inter' },
+                    formatter: (value) => value > 0 ? value : ''
+                }
+            },
+            scales: { 
+                y: { beginAtZero: true, suggestedMax: maxVal, ticks: { stepSize: 1 } }, 
+                x: { grid: { display: false } } 
+            }
         }
     });
 }
