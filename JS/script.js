@@ -18,21 +18,18 @@ function formatarData(dataOriginal) {
     return dataOriginal; 
 }
 
+// 🧠 O CÉREBRO DOS STATUS 
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     
-    // Status exatos e aproximados
-    if (s.includes('aberta')) return { icone: 'fa-file-lines', classe: 'bg-aberta' };
-    if (s.includes('iniciado')) return { icone: 'fa-person-digging', classe: 'bg-iniciado' };
-    if (s.includes('aprovacao') || s.includes('cotacao') || s.includes('aguardando')) return { icone: 'fa-hourglass-half', classe: 'bg-aprovacao' };
-    if (s.includes('manutencao')) return { icone: 'fa-wrench', classe: 'bg-aprovacao' };
-    if (s.includes('compras')) return { icone: 'fa-cart-shopping', classe: 'bg-aprovacao' };
-    if (s.includes('realizada') || s.includes('aprovado') || s.includes('aprovado hb')) return { icone: 'fa-check', classe: 'bg-concluido' };
-    if (s.includes('transito') || s.includes('em transito') || s.includes('enviada')) return { icone: 'fa-plane', classe: 'bg-transito' };
-    if (s.includes('entregue') || s.includes('recebido')) return { icone: 'fa-box-open', classe: 'bg-concluido' };
-    if (s.includes('concluido')) return { icone: 'fa-flag-checkered', classe: 'bg-concluido' };
+    if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
+    if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
+    if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
+    if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
+    if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
+    if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
     
-    return { icone: 'fa-circle-dot', classe: 'bg-aberta' };
+    return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
 function pegarValor(item, nomesPossiveis) {
@@ -43,12 +40,11 @@ function pegarValor(item, nomesPossiveis) {
     return '';
 }
 
-// NOVO: Função para o botão manual girar e dar feedback visual
 async function forcarSincronizacao() {
     const icon = document.getElementById('syncIcon');
-    icon.classList.add('fa-spin'); // Faz a setinha girar
+    icon.classList.add('fa-spin');
     await buscarDados();
-    icon.classList.remove('fa-spin'); // Para de girar
+    icon.classList.remove('fa-spin');
 }
 
 async function buscarDados() {
@@ -93,9 +89,8 @@ function renderizarTabela(lista) {
     const head = document.getElementById('tableHead');
     const body = document.getElementById('tableBody');
     
-    // Animação de Fade-in sempre que a tabela redesenhar
     body.classList.remove('animate-fade');
-    void body.offsetWidth; // Truque do JS para reiniciar a animação
+    void body.offsetWidth; 
     body.classList.add('animate-fade');
     
     if(lista.length === 0) {
@@ -107,9 +102,7 @@ function renderizarTabela(lista) {
     let htmlHead = '';
     let htmlBody = '';
 
-    // ==========================================
-    // TABELA DE ORDEM DE SERVIÇO
-    // ==========================================
+    // === TABELA DE ORDEM DE SERVIÇO ===
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr>
             <th>Nº OS</th>
@@ -129,7 +122,6 @@ function renderizarTabela(lista) {
             const equipe = pegarValor(item, ['Equipe', 'Time', 'Grupo']);
             const dataAbertura = formatarData(pegarValor(item, ['Data de Abertura', 'Data']));
             const dataConclusao = formatarData(pegarValor(item, ['Data de Conclusão', 'Conclusão', 'Data Fim']));
-
             const numeroOS = String(item['Nº OS'] || item['Nº'] || '').trim();
 
             const comprasVinculadas = todosDados.filter(d => {
@@ -165,12 +157,10 @@ function renderizarTabela(lista) {
             </tr>`;
         }).join('');
     } 
-    // ==========================================
-    // TABELA DE COMPRAS / LOGÍSTICA
-    // ==========================================
+    // === TABELA DE COMPRAS / LOGÍSTICA ===
     else {
         htmlHead = `<tr>
-            <th style="min-width: 90px;">Nº / Status</th>
+            <th style="min-width: 100px;">Nº / Status</th>
             <th style="min-width: 180px;">Descrição do Item</th>
             <th>Qtd</th>
             <th>Prioridade</th>
@@ -210,7 +200,7 @@ function renderizarTabela(lista) {
             return `<tr>
                 <td style="vertical-align: top;">
                     <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #0f172a;">${numeroCompra}</div>
-                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 3px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Cotação'}</span>
+                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 3px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>
                     ${badgeRef}
                 </td>
                 <td style="font-size: 13px; vertical-align: top; max-width: 220px; color: #334155;">
@@ -238,7 +228,7 @@ function renderizarKPIs(lista) {
     const total = lista.length;
     const concluidos = lista.filter(d => {
         const s = String(d.Status || '').toLowerCase();
-        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado hb');
+        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado');
     }).length;
     const emAndamento = total - concluidos;
 
@@ -249,18 +239,18 @@ function renderizarKPIs(lista) {
         </div>
         <div class="kpi-card">
             <div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div>
-            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
+            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento / Pendente</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div>
-            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
+            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados / Entregues</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
         </div>
     `;
 }
 
 function popularFiltroStatus() {
     const select = document.getElementById('statusFilter');
-    const valorAtual = select.value; // SALVA A ESCOLHA DO USUÁRIO
+    const valorAtual = select.value; 
 
     const filtradosAba = todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
@@ -272,7 +262,6 @@ function popularFiltroStatus() {
     select.innerHTML = '<option value="Todos">Todos os Status</option>';
     statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
 
-    // DEVOLVE A ESCOLHA PARA A CAIXINHA
     if(statusUnicos.includes(valorAtual)) {
         select.value = valorAtual;
     }
@@ -289,13 +278,10 @@ function mudarAba(tipo) {
     });
     document.getElementById('pageTitle').innerText = tipo.includes('Servi') ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
     
-    // Reseta o filtro sempre que mudar de aba
     document.getElementById('statusFilter').value = 'Todos'; 
-    
     popularFiltroStatus(); 
     atualizarPainel();
 }
 
-// Mantemos o timer rodando para ninguém ter painel desatualizado, mas agora ele não quebra o filtro!
 buscarDados();
 setInterval(buscarDados, 60000);
