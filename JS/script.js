@@ -18,7 +18,6 @@ function formatarData(dataOriginal) {
     return dataOriginal; 
 }
 
-// 🧠 O CÉREBRO DOS STATUS 
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     
@@ -102,10 +101,9 @@ function renderizarTabela(lista) {
     let htmlHead = '';
     let htmlBody = '';
 
-    // === TABELA DE ORDEM DE SERVIÇO ===
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr>
-            <th>Nº OS</th>
+            <th style="width: 90px;">Nº OS</th>
             <th>Descrição / Local</th>
             <th>Sistema</th>
             <th>Status</th>
@@ -117,7 +115,7 @@ function renderizarTabela(lista) {
 
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
-            const obs = item.Observações ? `<span class="obs-text" style="display:block; font-size:11px; color:#ef4444; margin-top:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
+            const obs = item.Observações ? `<span class="obs-text" style="display:block; font-size:10px; color:#ef4444; margin-top:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
             const sistema = pegarValor(item, ['Sistema', 'Tipo de Sistema']);
             const equipe = pegarValor(item, ['Equipe', 'Time', 'Grupo']);
             const dataAbertura = formatarData(pegarValor(item, ['Data de Abertura', 'Data']));
@@ -135,38 +133,38 @@ function renderizarTabela(lista) {
 
             let badgeVinculo = '';
             if (comprasVinculadas.length > 0) {
-                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:10px; background:#eff6ff; color:#2563eb; padding:3px 6px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
+                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:9px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
             }
 
             return `<tr>
-                <td style="vertical-align: top; width: 120px;">
-                    <strong>${numeroOS || '-'}</strong>
+                <td style="vertical-align: top;">
+                    <strong style="font-size: 12px;">${numeroOS || '-'}</strong>
                     ${badgeVinculo}
                 </td>
-                <td style="max-width: 200px; vertical-align: top;">
-                    ${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}
-                    <br><small style="color:#64748b;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
+                <td style="max-width: 180px; vertical-align: top;">
+                    <span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span>
+                    <br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
                     ${obs}
                 </td>
-                <td><span style="font-size: 11px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 4px 8px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
-                <td><span class="badge ${conf.classe}" style="font-size: 10px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Aberto'}</span></td>
-                <td style="font-size: 13px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
-                <td style="font-size: 13px; font-weight: 500; color: #334155;">${equipe || '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #64748b;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
+                <td><span style="font-size: 10px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 3px 6px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
+                <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Aberto'}</span></td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${equipe || '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
             </tr>`;
         }).join('');
     } 
-    // === TABELA DE COMPRAS / LOGÍSTICA ===
+    // === TABELA DE COMPRAS / LOGÍSTICA (COMPRIMIDA) ===
     else {
         htmlHead = `<tr>
-            <th style="min-width: 100px;">Nº / Status</th>
-            <th style="min-width: 180px;">Descrição do Item</th>
-            <th>Qtd</th>
+            <th style="width: 80px;">Nº / Status</th>
+            <th>Descrição do Item</th>
+            <th style="text-align:center;">Qtd</th>
             <th>Prioridade</th>
             <th>Solicitante</th>
             <th title="Data de Solicitação">Solicitado</th>
-            <th title="Data de Cotação enviada a HB">Cotação HB</th>
+            <th title="Data de Cotação enviada a HB">Cotação</th>
             <th title="Aprovado HB">Aprovado</th>
             <th title="Previsão de entrega">Previsão</th>
             <th title="Data de entrega no Site">Entregue</th>
@@ -192,29 +190,29 @@ function renderizarTabela(lista) {
             else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#d97706'; bgPrioridade = '#fffbeb'; }
             else if(prioridade.toLowerCase().includes('baix')) { corPrioridade = '#059669'; bgPrioridade = '#ecfdf5'; }
 
-            const pillPrioridade = prioridade ? `<span style="font-size: 10px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 4px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; border: 1px solid ${corPrioridade}30;">${prioridade.toUpperCase()}</span>` : '-';
+            const pillPrioridade = prioridade ? `<span style="font-size: 9px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 3px 6px; border-radius: 6px; font-weight: 700; white-space: nowrap; border: 1px solid ${corPrioridade}30;">${prioridade.toUpperCase()}</span>` : '-';
 
             const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
-            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:9px; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
+            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:8px; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
 
             return `<tr>
                 <td style="vertical-align: top;">
-                    <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #0f172a;">${numeroCompra}</div>
-                    <span class="badge ${conf.classe}" style="font-size: 9px; padding: 3px 6px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>
+                    <div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div>
+                    <span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>
                     ${badgeRef}
                 </td>
-                <td style="font-size: 13px; vertical-align: top; max-width: 220px; color: #334155;">
+                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">
                     ${descricao || '-'}
                 </td>
-                <td style="font-size: 14px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
+                <td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
                 <td style="vertical-align: middle;">${pillPrioridade}</td>
-                <td style="font-size: 13px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
                 
-                <td style="font-size: 12px; white-space: nowrap; color: #64748b;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #64748b;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
-                <td style="font-size: 12px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
             </tr>`;
         }).join('');
     }
@@ -235,15 +233,15 @@ function renderizarKPIs(lista) {
     grid.innerHTML = `
         <div class="kpi-card">
             <div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div>
-            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${total}</p></div>
+            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div>
-            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento / Pendente</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
+            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div>
-            <div><h3 style="margin:0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados / Entregues</h3><p style="margin:0; font-size: 26px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
+            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
         </div>
     `;
 }
