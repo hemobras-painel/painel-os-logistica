@@ -6,8 +6,9 @@
     <title>Painel do Comissionamento</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chama o seu arquivo CSS que está na pasta -->
     <link rel="stylesheet" href="CSS/style.css">
+    <!-- NOVO: Biblioteca de Gráficos Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <aside class="sidebar">
@@ -28,26 +29,30 @@
                 <select id="statusFilter" onchange="atualizarPainel()">
                     <option value="Todos">Todos os Status</option>
                 </select>
-                <!-- Botão de Sincronizar -->
                 <button id="btnSync" class="btn-sync" onclick="forcarSincronizacao()">
                     <i class="fa-solid fa-arrows-rotate" id="syncIcon"></i> Atualizar
                 </button>
             </div>
         </div>
         
-        <!-- Cartões de Resumo -->
         <div class="kpi-grid" id="kpiGrid"></div>
+
+        <!-- NOVO: Área dos Gráficos -->
+        <div class="charts-grid" id="chartsContainer">
+            <div class="chart-card">
+                <h3><i class="fa-solid fa-chart-pie" style="color: #3b82f6;"></i> Gargalos da Operação (Por Status)</h3>
+                <div class="chart-wrapper"><canvas id="chartStatus"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fa-solid fa-chart-simple" style="color: #d97706;"></i> <span id="chartTitleBar">Pendências Críticas</span></h3>
+                <div class="chart-wrapper"><canvas id="chartBar"></canvas></div>
+            </div>
+        </div>
         
-        <!-- Tabela -->
         <div class="table-container">
-            <table>
-                <thead id="tableHead"></thead>
-                <tbody id="tableBody"></tbody>
-            </table>
+            <table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table>
         </div>
     </main>
-
-    <!-- Chama o seu arquivo JavaScript que está na pasta -->
     <script src="JS/script.js"></script>
 </body>
 </html>

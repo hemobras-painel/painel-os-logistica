@@ -6,6 +6,10 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQ
 let todosDados = [];
 let abaAtual = 'Serviço';
 
+// Variáveis para guardar os gráficos na memória e atualizá-los sem piscar a tela
+let chartStatusInstancia = null;
+let chartBarInstancia = null;
+
 function formatarData(dataOriginal) {
     if (!dataOriginal || dataOriginal === '-' || String(dataOriginal).trim() === '') return '-';
     const d = new Date(dataOriginal);
@@ -81,7 +85,93 @@ function atualizarPainel() {
     });
     
     renderizarKPIs(filtrados);
+    renderizarGraficos(filtrados); // <--- Chama os gráficos novos!
     renderizarTabela(filtrados);
+}
+
+// === MOTOR DE GRÁFICOS (NOVO) ===
+function renderizarGraficos(lista) {
+    // 1. Filtramos apenas o que NÃO está concluído (Isso revela os atrasos)
+    const pendentes = lista.filter(d => {
+        const s = String(d.Status || '').toLowerCase();
+        return !(s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado hb'));
+    });
+
+    if (pendentes.length === 0) {
+        document.getElementById('chartsContainer').style.display = 'none'; // Esconde se tudo estiver perfeito
+        return;
+    } else {
+        document.getElementById('chartsContainer').style.display = 'grid';
+    }
+
+    // --- Lógica Gráfico 1: Gargalos por Status ---
+    const contagemStatus = {};
+    pendentes.forEach(d => {
+        const s = d.Status || 'Sem Status';
+        contagemStatus[s] = (contagemStatus[s] || 0) + 1;
+    });
+
+    const ctxStatus = document.getElementById('chartStatus').getContext('2d');
+    if (chartStatusInstancia) chartStatusInstancia.destroy(); // Apaga o gráfico velho antes de desenhar o novo
+
+    chartStatusInstancia = new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(contagemStatus),
+            datasets: [{
+                data: Object.values(contagemStatus),
+                backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'],
+                borderWidth: 2,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } } }
+        }
+    });
+
+    // --- Lógica Gráfico 2: Pendências por Prioridade (Compras) ou Equipe (OS) ---
+    const contagemBarra = {};
+    let labelBarra = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Equipe Técnica';
+    document.getElementById('chartTitleBar').innerText = labelBarra;
+
+    pendentes.forEach(d => {
+        let chave = '';
+        if (abaAtual.includes('Compra')) {
+            chave = pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']).toUpperCase() || 'NÃO DEFINIDA';
+        } else {
+            chave = pegarValor(d, ['Equipe', 'Time', 'Grupo']) || 'SEM EQUIPE';
+        }
+        contagemBarra[chave] = (contagemBarra[chave] || 0) + 1;
+    });
+
+    const labelsBarra = Object.keys(contagemBarra);
+    const dadosBarra = labelsBarra.map(l => contagemBarra[l]);
+
+    // Inteligência de Cores para as barras de Prioridade
+    const coresBarra = labelsBarra.map(l => {
+        if(l.includes('ALTA')) return '#ef4444'; // Vermelho
+        if(l.includes('MÉD')) return '#f59e0b'; // Amarelo
+        if(l.includes('BAIXA')) return '#10b981'; // Verde
+        return '#3b82f6'; // Azul Padrão
+    });
+
+    const ctxBar = document.getElementById('chartBar').getContext('2d');
+    if (chartBarInstancia) chartBarInstancia.destroy();
+
+    chartBarInstancia = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: labelsBarra,
+            datasets: [{ label: 'Qtd. Pendente', data: dadosBarra, backgroundColor: coresBarra, borderRadius: 6 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+        }
+    });
 }
 
 function renderizarTabela(lista) {
@@ -98,20 +188,10 @@ function renderizarTabela(lista) {
         return;
     }
 
-    let htmlHead = '';
-    let htmlBody = '';
+    let htmlHead = ''; let htmlBody = '';
 
     if (abaAtual.includes('Servi')) {
-        htmlHead = `<tr>
-            <th style="width: 90px;">Nº OS</th>
-            <th>Descrição / Local</th>
-            <th>Sistema</th>
-            <th>Status</th>
-            <th>Responsável</th>
-            <th>Equipe</th>
-            <th>Abertura</th>
-            <th>Conclusão</th>
-        </tr>`;
+        htmlHead = `<tr><th style="width: 90px;">Nº OS</th><th>Descrição / Local</th><th>Sistema</th><th>Status</th><th>Responsável</th><th>Equipe</th><th>Abertura</th><th>Conclusão</th></tr>`;
 
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
@@ -131,21 +211,11 @@ function renderizarTabela(lista) {
                 return false;
             });
 
-            let badgeVinculo = '';
-            if (comprasVinculadas.length > 0) {
-                badgeVinculo = `<div style="margin-top: 6px;"><span style="font-size:9px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>`;
-            }
+            let badgeVinculo = comprasVinculadas.length > 0 ? `<div style="margin-top: 6px;"><span style="font-size:9px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>` : '';
 
             return `<tr>
-                <td style="vertical-align: top;">
-                    <strong style="font-size: 12px;">${numeroOS || '-'}</strong>
-                    ${badgeVinculo}
-                </td>
-                <td style="max-width: 180px; vertical-align: top;">
-                    <span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span>
-                    <br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>
-                    ${obs}
-                </td>
+                <td style="vertical-align: top;"><strong style="font-size: 12px;">${numeroOS || '-'}</strong>${badgeVinculo}</td>
+                <td style="max-width: 180px; vertical-align: top;"><span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span><br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>${obs}</td>
                 <td><span style="font-size: 10px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 3px 6px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
                 <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Aberto'}</span></td>
                 <td style="font-size: 12px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
@@ -154,31 +224,16 @@ function renderizarTabela(lista) {
                 <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
             </tr>`;
         }).join('');
-    } 
-    // === TABELA DE COMPRAS / LOGÍSTICA (COMPRIMIDA) ===
-    else {
-        htmlHead = `<tr>
-            <th style="width: 80px;">Nº / Status</th>
-            <th>Descrição do Item</th>
-            <th style="text-align:center;">Qtd</th>
-            <th>Prioridade</th>
-            <th>Solicitante</th>
-            <th title="Data de Solicitação">Solicitado</th>
-            <th title="Data de Cotação enviada a HB">Cotação</th>
-            <th title="Aprovado HB">Aprovado</th>
-            <th title="Previsão de entrega">Previsão</th>
-            <th title="Data de entrega no Site">Entregue</th>
-        </tr>`;
+    } else {
+        htmlHead = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação</th><th title="Aprovado HB">Aprovado</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
 
         htmlBody = lista.map(item => {
             const conf = obterConfigStatus(item.Status);
-            
             const numeroCompra = item['Nº'] || item['Nº OS'] || '-';
             const descricao = pegarValor(item, ['Descrição do item', 'Descrição']);
             const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd']);
             const prioridade = pegarValor(item, ['Prioridade (alta/média/baixa)', 'Prioridade']);
             const solicitante = pegarValor(item, ['Solicitante']);
-            
             const dtSolicitado = formatarData(pegarValor(item, ['Solicitado? Data', 'Data de solicitação', 'Data Solicitação']));
             const dtCotacao = formatarData(pegarValor(item, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB', 'Cotação enviada HB']));
             const dtAprovado = formatarData(pegarValor(item, ['Aprovado HB? Data', 'Aprovado HB']));
@@ -196,18 +251,11 @@ function renderizarTabela(lista) {
             let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:8px; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
 
             return `<tr>
-                <td style="vertical-align: top;">
-                    <div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div>
-                    <span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>
-                    ${badgeRef}
-                </td>
-                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">
-                    ${descricao || '-'}
-                </td>
+                <td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div><span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>${badgeRef}</td>
+                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${descricao || '-'}</td>
                 <td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
                 <td style="vertical-align: middle;">${pillPrioridade}</td>
                 <td style="font-size: 12px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
-                
                 <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
                 <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
                 <td style="font-size: 11px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
@@ -216,9 +264,7 @@ function renderizarTabela(lista) {
             </tr>`;
         }).join('');
     }
-
-    head.innerHTML = htmlHead;
-    body.innerHTML = htmlBody;
+    head.innerHTML = htmlHead; body.innerHTML = htmlBody;
 }
 
 function renderizarKPIs(lista) {
@@ -226,30 +272,20 @@ function renderizarKPIs(lista) {
     const total = lista.length;
     const concluidos = lista.filter(d => {
         const s = String(d.Status || '').toLowerCase();
-        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado');
+        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado hb');
     }).length;
     const emAndamento = total - concluidos;
 
     grid.innerHTML = `
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div>
-            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div>
-            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div>
-            <div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concluidos}</p></div>
-        </div>
+        <div class="kpi-card"><div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concluidos}</p></div></div>
     `;
 }
 
 function popularFiltroStatus() {
     const select = document.getElementById('statusFilter');
     const valorAtual = select.value; 
-
     const filtradosAba = todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
         if (abaAtual.includes('Servi')) return abaPlanilha.includes('SERVI');
@@ -259,26 +295,18 @@ function popularFiltroStatus() {
     
     select.innerHTML = '<option value="Todos">Todos os Status</option>';
     statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
-
-    if(statusUnicos.includes(valorAtual)) {
-        select.value = valorAtual;
-    }
+    if(statusUnicos.includes(valorAtual)) select.value = valorAtual;
 }
 
 function mudarAba(tipo) {
     abaAtual = tipo;
     document.querySelectorAll('.nav-btn').forEach(btn => {
-        if(btn.innerText.includes(tipo.includes('Servi') ? 'Ordens' : 'Logística')) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        if(btn.innerText.includes(tipo.includes('Servi') ? 'Ordens' : 'Logística')) btn.classList.add('active');
+        else btn.classList.remove('active');
     });
     document.getElementById('pageTitle').innerText = tipo.includes('Servi') ? 'Gestão de Serviços' : 'Gestão de Logística & Compras';
-    
     document.getElementById('statusFilter').value = 'Todos'; 
-    popularFiltroStatus(); 
-    atualizarPainel();
+    popularFiltroStatus(); atualizarPainel();
 }
 
 buscarDados();
