@@ -8,7 +8,6 @@ let abaAtual = 'Serviço';
 let chartStatusInstancia = null;
 let chartBarInstancia = null;
 
-// Registra o Plugin de Rótulos de Dados para os gráficos
 Chart.register(ChartDataLabels);
 
 function formatarData(dataOriginal) {
@@ -101,7 +100,6 @@ function renderizarGraficos(lista) {
         document.getElementById('chartsContainer').style.display = 'grid';
     }
 
-    // --- Gráfico 1: Rosca (Status) ---
     const contagemStatus = {};
     pendentes.forEach(d => {
         const s = d.Status || 'Sem Status';
@@ -125,17 +123,15 @@ function renderizarGraficos(lista) {
             responsive: true, maintainAspectRatio: false,
             plugins: { 
                 legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } },
-                // ADICIONADO: Configuração dos Números na Rosca
                 datalabels: {
                     color: '#ffffff',
                     font: { weight: 'bold', size: 14, family: 'Inter' },
-                    formatter: (value) => value > 0 ? value : '' // Só mostra se tiver mais de 0
+                    formatter: (value) => value > 0 ? value : '' 
                 }
             }
         }
     });
 
-    // --- Gráfico 2: Barras (Prioridade ou Equipe) ---
     const contagemBarra = {};
     let labelBarra = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Equipe Técnica';
     document.getElementById('chartTitleBar').innerText = labelBarra;
@@ -160,7 +156,6 @@ function renderizarGraficos(lista) {
         return '#3b82f6'; 
     });
 
-    // Acha o maior número para dar um respiro no topo do gráfico
     const maxVal = Math.max(...dadosBarra, 0) + 2; 
 
     const ctxBar = document.getElementById('chartBar').getContext('2d');
@@ -176,11 +171,10 @@ function renderizarGraficos(lista) {
             responsive: true, maintainAspectRatio: false,
             plugins: { 
                 legend: { display: false },
-                // ADICIONADO: Configuração dos Números nas Barras
                 datalabels: {
-                    color: '#0f172a', // Cor escura para leitura fácil
-                    anchor: 'end',    // Ancorado no topo da barra
-                    align: 'top',     // Alinhado para cima
+                    color: '#0f172a', 
+                    anchor: 'end',    
+                    align: 'top',     
                     font: { weight: 'bold', size: 13, family: 'Inter' },
                     formatter: (value) => value > 0 ? value : ''
                 }
@@ -209,6 +203,9 @@ function renderizarTabela(lista) {
 
     let htmlHead = ''; let htmlBody = '';
 
+    // ==========================================
+    // ABA: SERVIÇOS
+    // ==========================================
     if (abaAtual.includes('Servi')) {
         htmlHead = `<tr><th style="width: 90px;">Nº OS</th><th>Descrição / Local</th><th>Sistema</th><th>Status</th><th>Responsável</th><th>Equipe</th><th>Abertura</th><th>Conclusão</th></tr>`;
 
@@ -243,7 +240,11 @@ function renderizarTabela(lista) {
                 <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
             </tr>`;
         }).join('');
-    } else {
+    } 
+    // ==========================================
+    // ABA: COMPRAS & LOGÍSTICA
+    // ==========================================
+    else {
         htmlHead = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação</th><th title="Aprovado HB">Aprovado</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
 
         htmlBody = lista.map(item => {
@@ -259,6 +260,9 @@ function renderizarTabela(lista) {
             const dtPrevisao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão de entrega', 'Previsão']));
             const dtEntregue = formatarData(pegarValor(item, ['Data Entregue', 'Data de entrega no Site', 'Entregue']));
 
+            // NOVO: Puxando o Sistema/Quadro da planilha
+            const sistema = pegarValor(item, ['Sistema/quadro', 'Sistema', 'Tipo de Sistema']);
+
             let corPrioridade = '#64748b'; let bgPrioridade = '#f1f5f9';
             if(prioridade.toLowerCase().includes('alta')) { corPrioridade = '#dc2626'; bgPrioridade = '#fef2f2'; }
             else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#d97706'; bgPrioridade = '#fffbeb'; }
@@ -268,10 +272,16 @@ function renderizarTabela(lista) {
 
             const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
             let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:8px; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
+            
+            // NOVO: Criando a etiqueta do Sistema (só aparece se estiver preenchido)
+            let badgeSistema = sistema ? `<div style="margin-top: 6px;"><span style="font-size: 9px; font-weight: 600; color: #475569; background: #e2e8f0; padding: 3px 6px; border-radius: 4px;"><i class="fa-solid fa-cube"></i> Sist: ${sistema}</span></div>` : '';
 
             return `<tr>
                 <td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div><span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>${badgeRef}</td>
-                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${descricao || '-'}</td>
+                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">
+                    ${descricao || '-'}
+                    ${badgeSistema}
+                </td>
                 <td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
                 <td style="vertical-align: middle;">${pillPrioridade}</td>
                 <td style="font-size: 12px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
