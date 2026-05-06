@@ -17,7 +17,6 @@
         <div class="nav-menu">
             <button class="nav-btn active" onclick="mudarAba('Serviço')"><i class="fa-solid fa-screwdriver-wrench"></i> Ordens de Serviço</button>
             <button class="nav-btn" onclick="mudarAba('Compra')"><i class="fa-solid fa-boxes-stacked"></i> Logística & Compras</button>
-            <!-- Menu de Calibrações e Certificados unificado -->
             <button class="nav-btn" onclick="mudarAba('Calibração')"><i class="fa-solid fa-microscope"></i> Calibrações & Certificados</button>
         </div>
         <div class="conn-status">
@@ -42,7 +41,8 @@
 
         <div class="charts-grid" id="chartsContainer">
             <div class="chart-card">
-                <h3><i class="fa-solid fa-chart-pie" style="color: #3b82f6;"></i> Gargalos da Operação (Por Status)</h3>
+                <!-- ID novo no título do gráfico de Rosca -->
+                <h3><i class="fa-solid fa-chart-pie" style="color: #3b82f6;"></i> <span id="chartTitlePie">Gargalos da Operação (Por Status)</span></h3>
                 <div class="chart-wrapper"><canvas id="chartStatus"></canvas></div>
             </div>
             <div class="chart-card">

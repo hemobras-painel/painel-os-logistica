@@ -24,14 +24,12 @@ function formatarData(dataOriginal) {
 
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    
     if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
     if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
     if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
     if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
     if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
     if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
-    
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
@@ -82,14 +80,14 @@ function atualizarPainel() {
     
     if (abaAtual === 'Calibração') {
         renderizarCalibracoes(filtrados);
+        renderizarGraficos(filtrados); // Chama os gráficos para Calibração
     } else {
         renderizarKPIs(filtrados);
-        renderizarGraficos(filtrados);
         renderizarTabela(filtrados);
+        renderizarGraficos(filtrados); // Chama os gráficos para Serviços/Compras
     }
 }
 
-// === MOTOR MATEMÁTICO DE CALIBRAÇÃO (LÊ AS QUANTIDADES DA PLANILHA) ===
 function renderizarCalibracoes(lista) {
     const container = document.getElementById('calibracaoContainer');
     
@@ -102,25 +100,21 @@ function renderizarCalibracoes(lista) {
 
     lista.forEach(item => {
         const sistema = pegarValor(item, ['Sistema', 'Sistema/quadro']) || 'Não Definido';
-        
-        // Puxa as quantidades que você digitou na planilha (se estiver vazio, ele assume Zero)
         const total = parseInt(pegarValor(item, ['Total'])) || 0;
         const calibrados = parseInt(pegarValor(item, ['Calibrados'])) || 0;
         const certAprovados = parseInt(pegarValor(item, ['Certificados Aprovados'])) || 0;
         const certPendentes = parseInt(pegarValor(item, ['Certificados Pendentes'])) || 0;
         
-        // O Cérebro calcula a porcentagem exata!
         let porcentagem = 0;
         if (total > 0) {
             porcentagem = Math.round((calibrados / total) * 100);
             if (porcentagem > 100) porcentagem = 100;
         }
 
-        // Define a cor baseada na performance
-        let cor = '#ef4444'; // Vermelho
-        if (porcentagem >= 30) cor = '#f59e0b'; // Amarelo
-        if (porcentagem >= 75) cor = '#3b82f6'; // Azul
-        if (porcentagem === 100) cor = '#10b981'; // Verde
+        let cor = '#ef4444'; 
+        if (porcentagem >= 30) cor = '#f59e0b'; 
+        if (porcentagem >= 75) cor = '#3b82f6'; 
+        if (porcentagem === 100) cor = '#10b981'; 
 
         html += `
             <div class="prog-card">
@@ -128,16 +122,8 @@ function renderizarCalibracoes(lista) {
                     <div class="prog-title"><i class="fa-solid fa-cube" style="color: ${cor}"></i> ${sistema}</div>
                     <div class="prog-pct" style="color: ${cor}">${porcentagem}%</div>
                 </div>
-                
-                <div class="prog-bg">
-                    <div class="prog-fill" style="width: 0%; background-color: ${cor};" data-target="${porcentagem}%"></div>
-                </div>
-                
-                <div class="prog-details">
-                    <span>Qtd. Total: ${total}</span>
-                    <span>Calibrados: ${calibrados}</span>
-                </div>
-
+                <div class="prog-bg"><div class="prog-fill" style="width: 0%; background-color: ${cor};" data-target="${porcentagem}%"></div></div>
+                <div class="prog-details"><span>Qtd. Total: ${total}</span><span>Calibrados: ${calibrados}</span></div>
                 <div class="cert-stats">
                     <span class="badge bg-concluido"><i class="fa-solid fa-certificate"></i> ${certAprovados} Aprovados</span>
                     <span class="badge bg-alerta"><i class="fa-solid fa-hourglass-half"></i> ${certPendentes} Pendentes</span>
@@ -149,77 +135,127 @@ function renderizarCalibracoes(lista) {
     container.className = 'calibracao-grid animate-fade';
     container.innerHTML = html;
 
-    // Dispara a animação das barras enchendo
     setTimeout(() => {
         const barras = container.querySelectorAll('.prog-fill');
         barras.forEach(barra => { barra.style.width = barra.getAttribute('data-target'); });
     }, 100);
 }
 
+// === MOTOR GRÁFICO DUPLO ===
 function renderizarGraficos(lista) {
-    const pendentes = lista.filter(d => {
-        const s = String(d.Status || '').toLowerCase();
-        return !(s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado'));
-    });
-
-    if (pendentes.length === 0) {
+    if (lista.length === 0) {
         document.getElementById('chartsContainer').style.display = 'none';
         return;
     } else {
         document.getElementById('chartsContainer').style.display = 'grid';
     }
 
-    const contagemStatus = {};
-    pendentes.forEach(d => {
-        const s = d.Status || 'Sem Status';
-        contagemStatus[s] = (contagemStatus[s] || 0) + 1;
-    });
-
     const ctxStatus = document.getElementById('chartStatus').getContext('2d');
-    if (chartStatusInstancia) chartStatusInstancia.destroy();
-
-    chartStatusInstancia = new Chart(ctxStatus, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(contagemStatus),
-            datasets: [{ data: Object.values(contagemStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2, hoverOffset: 4 }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } }
-        }
-    });
-
-    const contagemBarra = {};
-    let labelBarra = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
-    document.getElementById('chartTitleBar').innerText = labelBarra;
-
-    pendentes.forEach(d => {
-        let chave = abaAtual.includes('Compra') ? (pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']).toUpperCase() || 'NÃO DEFINIDA') : (pegarValor(d, ['Equipe', 'Responsável', 'Time']) || 'SEM EQUIPE');
-        contagemBarra[chave] = (contagemBarra[chave] || 0) + 1;
-    });
-
-    const labelsBarra = Object.keys(contagemBarra);
-    const dadosBarra = labelsBarra.map(l => contagemBarra[l]);
-
-    const coresBarra = labelsBarra.map(l => {
-        if(l.includes('ALTA')) return '#ef4444'; if(l.includes('MÉD')) return '#f59e0b'; if(l.includes('BAIXA')) return '#10b981'; return '#3b82f6'; 
-    });
-
-    const maxVal = Math.max(...dadosBarra, 0) + 2; 
-
     const ctxBar = document.getElementById('chartBar').getContext('2d');
+    if (chartStatusInstancia) chartStatusInstancia.destroy();
     if (chartBarInstancia) chartBarInstancia.destroy();
 
-    chartBarInstancia = new Chart(ctxBar, {
-        type: 'bar',
-        data: { labels: labelsBarra, datasets: [{ label: 'Qtd. Pendente', data: dadosBarra, backgroundColor: coresBarra, borderRadius: 6 }] },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, datalabels: { color: '#0f172a', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } },
-            scales: { y: { beginAtZero: true, suggestedMax: maxVal, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
-        }
-    });
+    // 1. GRÁFICOS EXCLUSIVOS PARA CALIBRAÇÕES
+    if (abaAtual === 'Calibração') {
+        document.getElementById('chartTitlePie').innerText = 'Status Global de Certificados';
+        document.getElementById('chartTitleBar').innerText = 'Avanço de Calibração (%)';
+
+        let totalAprovados = 0;
+        let totalPendentes = 0;
+        const labelsSistemas = [];
+        const dadosProgresso = [];
+
+        lista.forEach(item => {
+            const sistema = pegarValor(item, ['Sistema', 'Sistema/quadro']) || 'Outros';
+            const total = parseInt(pegarValor(item, ['Total'])) || 0;
+            const calibrados = parseInt(pegarValor(item, ['Calibrados'])) || 0;
+            
+            totalAprovados += parseInt(pegarValor(item, ['Certificados Aprovados'])) || 0;
+            totalPendentes += parseInt(pegarValor(item, ['Certificados Pendentes'])) || 0;
+
+            labelsSistemas.push(sistema);
+            let pct = total > 0 ? Math.round((calibrados/total)*100) : 0;
+            if(pct > 100) pct = 100;
+            dadosProgresso.push(pct);
+        });
+
+        // Rosca (Certificados)
+        chartStatusInstancia = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: ['Aprovados', 'Pendentes'],
+                datasets: [{ data: [totalAprovados, totalPendentes], backgroundColor: ['#10b981', '#f59e0b'], borderWidth: 2 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } }
+            }
+        });
+
+        // Barras (% de Avanço por Sistema)
+        chartBarInstancia = new Chart(ctxBar, {
+            type: 'bar',
+            data: { labels: labelsSistemas, datasets: [{ label: '% Concluído', data: dadosProgresso, backgroundColor: '#3b82f6', borderRadius: 6 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { color: '#0f172a', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13, family: 'Inter' }, formatter: (value) => value > 0 ? value + '%' : '' } },
+                scales: { y: { beginAtZero: true, suggestedMax: 110, ticks: { stepSize: 25 } }, x: { grid: { display: false } } }
+            }
+        });
+
+    } 
+    // 2. GRÁFICOS PADRÃO (SERVIÇOS E COMPRAS)
+    else {
+        document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
+        document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
+
+        const pendentes = lista.filter(d => {
+            const s = String(d.Status || '').toLowerCase();
+            return !(s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado'));
+        });
+
+        const contagemStatus = {};
+        pendentes.forEach(d => {
+            const s = d.Status || 'Sem Status';
+            contagemStatus[s] = (contagemStatus[s] || 0) + 1;
+        });
+
+        chartStatusInstancia = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(contagemStatus),
+                datasets: [{ data: Object.values(contagemStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } }
+            }
+        });
+
+        const contagemBarra = {};
+        pendentes.forEach(d => {
+            let chave = abaAtual.includes('Compra') ? (pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']).toUpperCase() || 'NÃO DEFINIDA') : (pegarValor(d, ['Equipe', 'Responsável', 'Time']) || 'SEM EQUIPE');
+            contagemBarra[chave] = (contagemBarra[chave] || 0) + 1;
+        });
+
+        const labelsBarra = Object.keys(contagemBarra);
+        const dadosBarra = labelsBarra.map(l => contagemBarra[l]);
+        const coresBarra = labelsBarra.map(l => {
+            if(l.includes('ALTA')) return '#ef4444'; if(l.includes('MÉD')) return '#f59e0b'; if(l.includes('BAIXA')) return '#10b981'; return '#3b82f6'; 
+        });
+
+        const maxVal = Math.max(...dadosBarra, 0) + 2; 
+
+        chartBarInstancia = new Chart(ctxBar, {
+            type: 'bar',
+            data: { labels: labelsBarra, datasets: [{ label: 'Qtd. Pendente', data: dadosBarra, backgroundColor: coresBarra, borderRadius: 6 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { color: '#0f172a', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } },
+                scales: { y: { beginAtZero: true, suggestedMax: maxVal, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+            }
+        });
+    }
 }
 
 function renderizarTabela(lista) {
