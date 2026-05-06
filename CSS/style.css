@@ -1,4 +1,4 @@
-/* === VARIÁVEIS GERAIS === */
+/* === VARIÁVEIS DE CORES === */
 :root { --bg: #f8fafc; --side: #0f172a; --primary: #3b82f6; --card: #ffffff; --border: #e2e8f0; --text: #1e293b; }
 
 body { font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; }
@@ -17,37 +17,38 @@ body { font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh
 .dot.online { background: #10b981; box-shadow: 0 0 8px #10b981; }
 .dot.error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
 
-/* === ÁREA PRINCIPAL (Padding Reduzido) === */
+/* === ÁREA PRINCIPAL === */
 .main-content { flex: 1; padding: 20px 25px; overflow-y: auto; scroll-behavior: smooth; }
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .header h1 { margin: 0; font-size: 24px; font-weight: 700; color: #0f172a; }
 
-/* === FILTRO E BOTÕES === */
+/* === FILTROS E BOTÕES === */
 .header-actions { display: flex; gap: 15px; align-items: center; }
-select { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); font-family: 'Inter'; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: all 0.2s; outline: none; background: white; }
-select:hover, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-.btn-sync { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-family: 'Inter'; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2); }
-.btn-sync:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.3); }
-.btn-sync:active { transform: translateY(1px); }
+select { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); font-family: 'Inter'; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; outline: none; background: white; }
+.btn-sync { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-family: 'Inter'; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+.btn-sync:hover { background: #2563eb; transform: translateY(-1px); }
 
-/* === KPIS E ANIMAÇÕES === */
+/* === CARTÕES (KPIs) === */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
-.kpi-card { background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); display: flex; align-items: center; gap: 15px; transition: all 0.3s ease; cursor: default; }
-.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-color: transparent; }
-.kpi-icon { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: transform 0.3s; }
-.kpi-card:hover .kpi-icon { transform: scale(1.1) rotate(-5deg); }
+.kpi-card { background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); display: flex; align-items: center; gap: 15px; transition: transform 0.3s; }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+.kpi-icon { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
 
-/* === TABELA (O segredo do espaço está aqui: Padding menor e Fontes ajustadas) === */
-.table-container { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-table { width: 100%; border-collapse: collapse; table-layout: auto; }
-th { text-align: left; padding: 12px 10px; font-size: 11px; color: #64748b; border-bottom: 1px solid var(--border); background: #f8fafc; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+/* === GRÁFICOS === */
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px; margin-bottom: 25px; }
+.chart-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.chart-card h3 { margin: 0 0 15px 0; font-size: 13px; color: #475569; text-transform: uppercase; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.chart-wrapper { position: relative; height: 220px; width: 100%; }
+
+/* === TABELA COMPACTADA === */
+.table-container { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px 10px; font-size: 11px; color: #64748b; border-bottom: 1px solid var(--border); background: #f8fafc; text-transform: uppercase; font-weight: 600; }
 td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid var(--border); transition: background-color 0.2s; }
-tr { transition: background-color 0.2s ease; }
 tr:hover td { background-color: #f1f5f9; } 
 
-/* === PALETA DE CORES DOS STATUS === */
+/* === ETIQUETAS DE CORES (BADGES) === */
 .badge { padding: 4px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
-
 .bg-padrao { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 .bg-solicitado { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
 .bg-cotacao { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
@@ -56,12 +57,20 @@ tr:hover td { background-color: #f1f5f9; }
 .bg-transito { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
 .bg-concluido { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
 
-/* === ANIMAÇÃO DA TABELA === */
+/* === BARRAS DE PROGRESSO (CALIBRAÇÃO) === */
+.calibracao-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.prog-card { background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s ease; }
+.prog-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.08); }
+.prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.prog-title { font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+.prog-pct { font-size: 20px; font-weight: 800; }
+.prog-bg { width: 100%; height: 10px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 15px; }
+.prog-fill { height: 100%; border-radius: 10px; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Novos estilos para os detalhes da calibração */
+.prog-details { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed var(--border); }
+.cert-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* === ANIMAÇÕES === */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
-
-/* === GRÁFICOS (Adicione no final do seu CSS) === */
-.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px; margin-bottom: 25px; }
-.chart-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.chart-card h3 { margin: 0 0 15px 0; font-size: 13px; color: #475569; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-.chart-wrapper { position: relative; height: 220px; width: 100%; }
