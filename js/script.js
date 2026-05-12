@@ -24,12 +24,17 @@ function formatarData(dataOriginal) {
 
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    
+    if (s.includes('certificado aprovado')) return { icone: 'fa-certificate', classe: 'bg-concluido' };
+    if (s.includes('aguardando certificado')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
+
     if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
     if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
     if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
     if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
     if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
     if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
+    
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
@@ -80,11 +85,11 @@ function atualizarPainel() {
     
     if (abaAtual === 'Calibração') {
         renderizarCalibracoes(filtrados);
-        renderizarGraficos(filtrados); // Chama os gráficos para Calibração
+        renderizarGraficos(filtrados);
     } else {
         renderizarKPIs(filtrados);
         renderizarTabela(filtrados);
-        renderizarGraficos(filtrados); // Chama os gráficos para Serviços/Compras
+        renderizarGraficos(filtrados);
     }
 }
 
@@ -92,7 +97,7 @@ function renderizarCalibracoes(lista) {
     const container = document.getElementById('calibracaoContainer');
     
     if(lista.length === 0) {
-        container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 60px; background: #fff; border-radius: 12px; border: 1px dashed #cbd5e1; color:#64748b; font-weight: 500;">Nenhum dado encontrado.<br><br>Crie uma aba chamada <b>Calibrações</b> e coloque as colunas de quantidades.</div>';
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 60px; background: #fff; border-radius: 12px; border: 1px dashed #cbd5e1; color:#64748b; font-weight: 500;">Nenhum dado encontrado.<br><br>Crie uma aba chamada <b>Calibrações</b> na planilha online e insira as colunas: Sistema, Total, Calibrados, Certificados Aprovados, Certificados Pendentes.</div>';
         return;
     }
 
@@ -141,7 +146,6 @@ function renderizarCalibracoes(lista) {
     }, 100);
 }
 
-// === MOTOR GRÁFICO DUPLO ===
 function renderizarGraficos(lista) {
     if (lista.length === 0) {
         document.getElementById('chartsContainer').style.display = 'none';
@@ -155,7 +159,7 @@ function renderizarGraficos(lista) {
     if (chartStatusInstancia) chartStatusInstancia.destroy();
     if (chartBarInstancia) chartBarInstancia.destroy();
 
-    // 1. GRÁFICOS EXCLUSIVOS PARA CALIBRAÇÕES
+    // 1. GRÁFICOS PARA CALIBRAÇÕES
     if (abaAtual === 'Calibração') {
         document.getElementById('chartTitlePie').innerText = 'Status Global de Certificados';
         document.getElementById('chartTitleBar').innerText = 'Avanço de Calibração (%)';
@@ -179,7 +183,6 @@ function renderizarGraficos(lista) {
             dadosProgresso.push(pct);
         });
 
-        // Rosca (Certificados)
         chartStatusInstancia = new Chart(ctxStatus, {
             type: 'doughnut',
             data: {
@@ -192,7 +195,6 @@ function renderizarGraficos(lista) {
             }
         });
 
-        // Barras (% de Avanço por Sistema)
         chartBarInstancia = new Chart(ctxBar, {
             type: 'bar',
             data: { labels: labelsSistemas, datasets: [{ label: '% Concluído', data: dadosProgresso, backgroundColor: '#3b82f6', borderRadius: 6 }] },
@@ -204,7 +206,7 @@ function renderizarGraficos(lista) {
         });
 
     } 
-    // 2. GRÁFICOS PADRÃO (SERVIÇOS E COMPRAS)
+    // 2. GRÁFICOS PARA SERVIÇOS E COMPRAS
     else {
         document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
         document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
@@ -298,9 +300,12 @@ function renderizarTabela(lista) {
             let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:8px; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
             let badgeSistema = sistema ? `<div style="margin-top: 6px;"><span style="font-size: 9px; font-weight: 600; color: #475569; background: #e2e8f0; padding: 3px 6px; border-radius: 4px;"><i class="fa-solid fa-cube"></i> Sist: ${sistema}</span></div>` : '';
 
+            const anexoCompra = pegarValor(item, ['Anexo', 'Foto', 'Link', 'Link da Foto']);
+            let btnAnexo = anexoCompra ? `<br><a href="${anexoCompra}" target="_blank" class="btn-anexo"><i class="fa-solid fa-image"></i> Ver Foto</a>` : '';
+
             return `<tr>
                 <td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div><span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>${badgeRef}</td>
-                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${descricao || '-'}${badgeSistema}</td>
+                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${descricao || '-'}${badgeSistema}${btnAnexo}</td>
                 <td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
                 <td style="vertical-align: middle;">${pillPrioridade}</td>
                 <td style="font-size: 12px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
@@ -329,9 +334,12 @@ function renderizarTabela(lista) {
 
             let badgeVinculo = comprasVinculadas.length > 0 ? `<div style="margin-top: 6px;"><span style="font-size:9px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>` : '';
 
+            const anexoOS = pegarValor(item, ['Anexo', 'Foto', 'Link', 'Link da Foto', 'Evidência']);
+            let btnAnexoOS = anexoOS ? `<br><a href="${anexoOS}" target="_blank" class="btn-anexo"><i class="fa-solid fa-camera"></i> Ver Anexo</a>` : '';
+
             return `<tr>
                 <td style="vertical-align: top;"><strong style="font-size: 12px;">${numeroOS || '-'}</strong>${badgeVinculo}</td>
-                <td style="max-width: 180px; vertical-align: top;"><span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span><br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>${obs}</td>
+                <td style="max-width: 180px; vertical-align: top;"><span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span><br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>${obs}${btnAnexoOS}</td>
                 <td><span style="font-size: 10px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 3px 6px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
                 <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Pendente'}</span></td>
                 <td style="font-size: 12px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
@@ -349,7 +357,7 @@ function renderizarKPIs(lista) {
     const total = lista.length;
     const concluidos = lista.filter(d => {
         const s = String(d.Status || '').toLowerCase();
-        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado');
+        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('certificado aprovado') || s.includes('aprovado');
     }).length;
     const emAndamento = total - concluidos;
 

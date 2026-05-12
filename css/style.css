@@ -66,10 +66,16 @@ tr:hover td { background-color: #f1f5f9; }
 .prog-pct { font-size: 20px; font-weight: 800; }
 .prog-bg { width: 100%; height: 10px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 15px; }
 .prog-fill { height: 100%; border-radius: 10px; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* Novos estilos para os detalhes da calibração */
 .prog-details { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed var(--border); }
 .cert-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* === BOTÃO DE ANEXO / FOTO === */
+.btn-anexo {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 4px 10px;
+    background-color: #f1f5f9; color: #475569; font-size: 10px; font-weight: 600;
+    text-decoration: none; border-radius: 6px; border: 1px solid #cbd5e1; transition: all 0.2s ease;
+}
+.btn-anexo:hover { background-color: #e2e8f0; color: #0f172a; border-color: #94a3b8; transform: translateY(-1px); }
 
 /* === ANIMAÇÕES === */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
