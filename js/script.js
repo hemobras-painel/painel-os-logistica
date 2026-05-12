@@ -1,0 +1,408 @@
+// === ARQUIVO: script.js ===
+
+// 1. O SEU LINK DO GOOGLE APPS SCRIPT:
+const API_URL = 'https://script.google.com/macros/s/AKfycbyt9ZEFqSyBwY_lGfxO6dbQupf52X44D1Lg9dkYAYRiNaxBemtuqCGTg5sfXCbcKxaePg/exec';
+
+let todosDados = [];
+let abaAtual = 'Serviço';
+let chartStatusInstancia = null;
+let chartBarInstancia = null;
+
+Chart.register(ChartDataLabels);
+
+function formatarData(dataOriginal) {
+    if (!dataOriginal || dataOriginal === '-' || String(dataOriginal).trim() === '') return '-';
+    const d = new Date(dataOriginal);
+    if (!isNaN(d.getTime())) {
+        const dia = String(d.getUTCDate()).padStart(2, '0');
+        const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const ano = d.getUTCFullYear();
+        return `${dia}/${mes}/${ano}`;
+    }
+    return dataOriginal; 
+}
+
+function obterConfigStatus(statusReal) {
+    const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
+    if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
+    if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
+    if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
+    if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
+    if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
+    return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
+}
+
+function pegarValor(item, nomesPossiveis) {
+    for (let nome of nomesPossiveis) {
+        const chaveReal = Object.keys(item).find(k => k.toLowerCase().trim() === nome.toLowerCase().trim());
+        if (chaveReal && item[chaveReal]) return item[chaveReal];
+    }
+    return '';
+}
+
+async function forcarSincronizacao() {
+    const icon = document.getElementById('syncIcon');
+    icon.classList.add('fa-spin');
+    await buscarDados();
+    icon.classList.remove('fa-spin');
+}
+
+async function buscarDados() {
+    try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error('Erro na rede');
+        todosDados = await response.json(); 
+        document.getElementById('connIndicator').className = 'status-dot online';
+        document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
+        popularFiltroStatus();
+        atualizarPainel();
+    } catch (erro) {
+        console.error("Erro de conexão:", erro);
+        document.getElementById('connIndicator').className = 'status-dot error';
+        document.getElementById('connText').innerText = "Erro de conexão API!";
+    }
+}
+
+function atualizarPainel() {
+    const filtro = document.getElementById('statusFilter').value;
+    const filtrados = todosDados.filter(d => {
+        const status = (d.Status || '').trim();
+        const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
+
+        let pertenceAAba = false;
+        if (abaAtual === 'Serviço' && abaPlanilha.includes('SERVI')) pertenceAAba = true;
+        else if (abaAtual === 'Compra' && (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA'))) pertenceAAba = true;
+        else if (abaAtual === 'Calibração' && abaPlanilha.includes('CALIBRA')) pertenceAAba = true;
+
+        return pertenceAAba && (filtro === 'Todos' || status === filtro);
+    });
+    
+    if (abaAtual === 'Calibração') {
+        renderizarCalibracoes(filtrados);
+        renderizarGraficos(filtrados); // Chama os gráficos para Calibração
+    } else {
+        renderizarKPIs(filtrados);
+        renderizarTabela(filtrados);
+        renderizarGraficos(filtrados); // Chama os gráficos para Serviços/Compras
+    }
+}
+
+function renderizarCalibracoes(lista) {
+    const container = document.getElementById('calibracaoContainer');
+    
+    if(lista.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 60px; background: #fff; border-radius: 12px; border: 1px dashed #cbd5e1; color:#64748b; font-weight: 500;">Nenhum dado encontrado.<br><br>Crie uma aba chamada <b>Calibrações</b> e coloque as colunas de quantidades.</div>';
+        return;
+    }
+
+    let html = '';
+
+    lista.forEach(item => {
+        const sistema = pegarValor(item, ['Sistema', 'Sistema/quadro']) || 'Não Definido';
+        const total = parseInt(pegarValor(item, ['Total'])) || 0;
+        const calibrados = parseInt(pegarValor(item, ['Calibrados'])) || 0;
+        const certAprovados = parseInt(pegarValor(item, ['Certificados Aprovados'])) || 0;
+        const certPendentes = parseInt(pegarValor(item, ['Certificados Pendentes'])) || 0;
+        
+        let porcentagem = 0;
+        if (total > 0) {
+            porcentagem = Math.round((calibrados / total) * 100);
+            if (porcentagem > 100) porcentagem = 100;
+        }
+
+        let cor = '#ef4444'; 
+        if (porcentagem >= 30) cor = '#f59e0b'; 
+        if (porcentagem >= 75) cor = '#3b82f6'; 
+        if (porcentagem === 100) cor = '#10b981'; 
+
+        html += `
+            <div class="prog-card">
+                <div class="prog-header">
+                    <div class="prog-title"><i class="fa-solid fa-cube" style="color: ${cor}"></i> ${sistema}</div>
+                    <div class="prog-pct" style="color: ${cor}">${porcentagem}%</div>
+                </div>
+                <div class="prog-bg"><div class="prog-fill" style="width: 0%; background-color: ${cor};" data-target="${porcentagem}%"></div></div>
+                <div class="prog-details"><span>Qtd. Total: ${total}</span><span>Calibrados: ${calibrados}</span></div>
+                <div class="cert-stats">
+                    <span class="badge bg-concluido"><i class="fa-solid fa-certificate"></i> ${certAprovados} Aprovados</span>
+                    <span class="badge bg-alerta"><i class="fa-solid fa-hourglass-half"></i> ${certPendentes} Pendentes</span>
+                </div>
+            </div>
+        `;
+    });
+
+    container.className = 'calibracao-grid animate-fade';
+    container.innerHTML = html;
+
+    setTimeout(() => {
+        const barras = container.querySelectorAll('.prog-fill');
+        barras.forEach(barra => { barra.style.width = barra.getAttribute('data-target'); });
+    }, 100);
+}
+
+// === MOTOR GRÁFICO DUPLO ===
+function renderizarGraficos(lista) {
+    if (lista.length === 0) {
+        document.getElementById('chartsContainer').style.display = 'none';
+        return;
+    } else {
+        document.getElementById('chartsContainer').style.display = 'grid';
+    }
+
+    const ctxStatus = document.getElementById('chartStatus').getContext('2d');
+    const ctxBar = document.getElementById('chartBar').getContext('2d');
+    if (chartStatusInstancia) chartStatusInstancia.destroy();
+    if (chartBarInstancia) chartBarInstancia.destroy();
+
+    // 1. GRÁFICOS EXCLUSIVOS PARA CALIBRAÇÕES
+    if (abaAtual === 'Calibração') {
+        document.getElementById('chartTitlePie').innerText = 'Status Global de Certificados';
+        document.getElementById('chartTitleBar').innerText = 'Avanço de Calibração (%)';
+
+        let totalAprovados = 0;
+        let totalPendentes = 0;
+        const labelsSistemas = [];
+        const dadosProgresso = [];
+
+        lista.forEach(item => {
+            const sistema = pegarValor(item, ['Sistema', 'Sistema/quadro']) || 'Outros';
+            const total = parseInt(pegarValor(item, ['Total'])) || 0;
+            const calibrados = parseInt(pegarValor(item, ['Calibrados'])) || 0;
+            
+            totalAprovados += parseInt(pegarValor(item, ['Certificados Aprovados'])) || 0;
+            totalPendentes += parseInt(pegarValor(item, ['Certificados Pendentes'])) || 0;
+
+            labelsSistemas.push(sistema);
+            let pct = total > 0 ? Math.round((calibrados/total)*100) : 0;
+            if(pct > 100) pct = 100;
+            dadosProgresso.push(pct);
+        });
+
+        // Rosca (Certificados)
+        chartStatusInstancia = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: ['Aprovados', 'Pendentes'],
+                datasets: [{ data: [totalAprovados, totalPendentes], backgroundColor: ['#10b981', '#f59e0b'], borderWidth: 2 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } }
+            }
+        });
+
+        // Barras (% de Avanço por Sistema)
+        chartBarInstancia = new Chart(ctxBar, {
+            type: 'bar',
+            data: { labels: labelsSistemas, datasets: [{ label: '% Concluído', data: dadosProgresso, backgroundColor: '#3b82f6', borderRadius: 6 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { color: '#0f172a', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13, family: 'Inter' }, formatter: (value) => value > 0 ? value + '%' : '' } },
+                scales: { y: { beginAtZero: true, suggestedMax: 110, ticks: { stepSize: 25 } }, x: { grid: { display: false } } }
+            }
+        });
+
+    } 
+    // 2. GRÁFICOS PADRÃO (SERVIÇOS E COMPRAS)
+    else {
+        document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
+        document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
+
+        const pendentes = lista.filter(d => {
+            const s = String(d.Status || '').toLowerCase();
+            return !(s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado'));
+        });
+
+        const contagemStatus = {};
+        pendentes.forEach(d => {
+            const s = d.Status || 'Sem Status';
+            contagemStatus[s] = (contagemStatus[s] || 0) + 1;
+        });
+
+        chartStatusInstancia = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(contagemStatus),
+                datasets: [{ data: Object.values(contagemStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } }
+            }
+        });
+
+        const contagemBarra = {};
+        pendentes.forEach(d => {
+            let chave = abaAtual.includes('Compra') ? (pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']).toUpperCase() || 'NÃO DEFINIDA') : (pegarValor(d, ['Equipe', 'Responsável', 'Time']) || 'SEM EQUIPE');
+            contagemBarra[chave] = (contagemBarra[chave] || 0) + 1;
+        });
+
+        const labelsBarra = Object.keys(contagemBarra);
+        const dadosBarra = labelsBarra.map(l => contagemBarra[l]);
+        const coresBarra = labelsBarra.map(l => {
+            if(l.includes('ALTA')) return '#ef4444'; if(l.includes('MÉD')) return '#f59e0b'; if(l.includes('BAIXA')) return '#10b981'; return '#3b82f6'; 
+        });
+
+        const maxVal = Math.max(...dadosBarra, 0) + 2; 
+
+        chartBarInstancia = new Chart(ctxBar, {
+            type: 'bar',
+            data: { labels: labelsBarra, datasets: [{ label: 'Qtd. Pendente', data: dadosBarra, backgroundColor: coresBarra, borderRadius: 6 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { color: '#0f172a', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13, family: 'Inter' }, formatter: (value) => value > 0 ? value : '' } },
+                scales: { y: { beginAtZero: true, suggestedMax: maxVal, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+            }
+        });
+    }
+}
+
+function renderizarTabela(lista) {
+    const head = document.getElementById('tableHead');
+    const body = document.getElementById('tableBody');
+    
+    body.classList.remove('animate-fade'); void body.offsetWidth; body.classList.add('animate-fade');
+    
+    if(lista.length === 0) {
+        head.innerHTML = '';
+        body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:#64748b; font-weight: 500;">Nenhum registro encontrado nesta aba.</td></tr>';
+        return;
+    }
+
+    let htmlHead = ''; let htmlBody = '';
+
+    if (abaAtual === 'Compra') {
+        htmlHead = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação</th><th title="Aprovado HB">Aprovado</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
+        htmlBody = lista.map(item => {
+            const conf = obterConfigStatus(item.Status);
+            const numeroCompra = item['Nº'] || item['Nº OS'] || '-';
+            const descricao = pegarValor(item, ['Descrição do item', 'Descrição']);
+            const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd']);
+            const prioridade = pegarValor(item, ['Prioridade (alta/média/baixa)', 'Prioridade']);
+            const solicitante = pegarValor(item, ['Solicitante']);
+            const dtSolicitado = formatarData(pegarValor(item, ['Solicitado? Data', 'Data de solicitação', 'Data Solicitação']));
+            const dtCotacao = formatarData(pegarValor(item, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB', 'Cotação enviada HB']));
+            const dtAprovado = formatarData(pegarValor(item, ['Aprovado HB? Data', 'Aprovado HB']));
+            const dtPrevisao = formatarData(pegarValor(item, ['Previsão de Entrega', 'Previsão de entrega', 'Previsão']));
+            const dtEntregue = formatarData(pegarValor(item, ['Data Entregue', 'Data de entrega no Site', 'Entregue']));
+            const sistema = pegarValor(item, ['Sistema/quadro', 'Sistema', 'Tipo de Sistema']);
+
+            let corPrioridade = '#64748b'; let bgPrioridade = '#f1f5f9';
+            if(prioridade.toLowerCase().includes('alta')) { corPrioridade = '#dc2626'; bgPrioridade = '#fef2f2'; }
+            else if(prioridade.toLowerCase().includes('méd') || prioridade.toLowerCase().includes('med')) { corPrioridade = '#d97706'; bgPrioridade = '#fffbeb'; }
+            else if(prioridade.toLowerCase().includes('baix')) { corPrioridade = '#059669'; bgPrioridade = '#ecfdf5'; }
+
+            const pillPrioridade = prioridade ? `<span style="font-size: 9px; background: ${bgPrioridade}; color: ${corPrioridade}; padding: 3px 6px; border-radius: 6px; font-weight: 700; white-space: nowrap; border: 1px solid ${corPrioridade}30;">${prioridade.toUpperCase()}</span>` : '-';
+            const osVinculada = pegarValor(item, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço']);
+            let badgeRef = osVinculada ? `<div style="margin-top: 4px;"><span style="font-size:8px; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:4px; font-weight: 600; border: 1px solid #e2e8f0;"><i class="fa-solid fa-link"></i> OS ${osVinculada}</span></div>` : '';
+            let badgeSistema = sistema ? `<div style="margin-top: 6px;"><span style="font-size: 9px; font-weight: 600; color: #475569; background: #e2e8f0; padding: 3px 6px; border-radius: 4px;"><i class="fa-solid fa-cube"></i> Sist: ${sistema}</span></div>` : '';
+
+            return `<tr>
+                <td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${numeroCompra}</div><span class="badge ${conf.classe}" style="padding: 2px 5px;"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>${badgeRef}</td>
+                <td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${descricao || '-'}${badgeSistema}</td>
+                <td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td>
+                <td style="vertical-align: middle;">${pillPrioridade}</td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${solicitante || '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtSolicitado !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> ${dtSolicitado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtCotacao !== '-' ? `<i class="fa-regular fa-envelope"></i> ${dtCotacao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtAprovado !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> ${dtAprovado}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrevisao !== '-' ? `<i class="fa-regular fa-clock"></i> ${dtPrevisao}` : '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEntregue !== '-' ? `<i class="fa-solid fa-box-open"></i> ${dtEntregue}` : '-'}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        htmlHead = `<tr><th style="width: 90px;">Nº OS / Ref</th><th>Descrição / Local</th><th>Sistema</th><th>Status</th><th>Responsável</th><th>Equipe</th><th>Abertura</th><th>Conclusão</th></tr>`;
+        htmlBody = lista.map(item => {
+            const conf = obterConfigStatus(item.Status);
+            const obs = item.Observações ? `<span class="obs-text" style="display:block; font-size:10px; color:#ef4444; margin-top:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.Observações.replace(/^- /, '')}</span>` : '';
+            const sistema = pegarValor(item, ['Sistema', 'Tipo de Sistema']);
+            const equipe = pegarValor(item, ['Equipe', 'Time', 'Grupo']);
+            const dataAbertura = formatarData(pegarValor(item, ['Data de Abertura', 'Data']));
+            const dataConclusao = formatarData(pegarValor(item, ['Data de Conclusão', 'Conclusão', 'Data Fim']));
+            const numeroOS = String(item['Nº OS'] || item['Nº'] || '').trim();
+
+            const comprasVinculadas = todosDados.filter(d => {
+                const abaPlanilha = String(d.AbaOrigem || '').toUpperCase();
+                return (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA')) && String(pegarValor(d, ['O.S Vinculada', 'OS Relacionada', 'OS Serviço'])).trim() === numeroOS && numeroOS !== '';
+            });
+
+            let badgeVinculo = comprasVinculadas.length > 0 ? `<div style="margin-top: 6px;"><span style="font-size:9px; background:#eff6ff; color:#2563eb; padding:2px 5px; border-radius:4px; border: 1px solid #bfdbfe; font-weight: 600;"><i class="fa-solid fa-link"></i> ${comprasVinculadas.length} Compra(s) Vinculada(s)</span></div>` : '';
+
+            return `<tr>
+                <td style="vertical-align: top;"><strong style="font-size: 12px;">${numeroOS || '-'}</strong>${badgeVinculo}</td>
+                <td style="max-width: 180px; vertical-align: top;"><span style="font-size: 12px;">${pegarValor(item, ['Descrição do Serviço', 'Descrição']) || '-'}</span><br><small style="color:#64748b; font-size: 10px;"><i class="fa-solid fa-location-dot"></i> ${item.Local || 'N/A'}</small>${obs}</td>
+                <td><span style="font-size: 10px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 3px 6px; border-radius: 6px;">${sistema || 'N/A'}</span></td>
+                <td><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Pendente'}</span></td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${item.Responsável || '-'}</td>
+                <td style="font-size: 12px; font-weight: 500; color: #334155;">${equipe || '-'}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #64748b;"><i class="fa-regular fa-calendar"></i> ${dataAbertura}</td>
+                <td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 600;">${dataConclusao !== '-' ? `<i class="fa-solid fa-check-circle"></i> ${dataConclusao}` : '-'}</td>
+            </tr>`;
+        }).join('');
+    }
+    head.innerHTML = htmlHead; body.innerHTML = htmlBody;
+}
+
+function renderizarKPIs(lista) {
+    const grid = document.getElementById('kpiGrid');
+    const total = lista.length;
+    const concluidos = lista.filter(d => {
+        const s = String(d.Status || '').toLowerCase();
+        return s.includes('conclu') || s.includes('entregue') || s.includes('realizada') || s.includes('aprovado');
+    }).length;
+    const emAndamento = total - concluidos;
+
+    grid.innerHTML = `
+        <div class="kpi-card"><div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${emAndamento}</p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concluidos}</p></div></div>
+    `;
+}
+
+function popularFiltroStatus() {
+    const select = document.getElementById('statusFilter');
+    const valorAtual = select.value; 
+    const filtradosAba = todosDados.filter(d => {
+        const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
+        if (abaAtual === 'Serviço' && abaPlanilha.includes('SERVI')) return true;
+        if (abaAtual === 'Compra' && (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA'))) return true;
+        if (abaAtual === 'Calibração' && abaPlanilha.includes('CALIBRA')) return true;
+        return false;
+    });
+    const statusUnicos = [...new Set(filtradosAba.map(d => d.Status))].filter(s => s);
+    
+    select.innerHTML = '<option value="Todos">Todos os Status</option>';
+    statusUnicos.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
+    if(statusUnicos.includes(valorAtual)) select.value = valorAtual;
+}
+
+function mudarAba(tipo) {
+    abaAtual = tipo;
+    
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (tipo === 'Serviço' && btn.innerText.includes('Ordens')) btn.classList.add('active');
+        if (tipo === 'Compra' && btn.innerText.includes('Logística')) btn.classList.add('active');
+        if (tipo === 'Calibração' && btn.innerText.includes('Calibrações')) btn.classList.add('active');
+    });
+
+    const titulos = { 
+        'Serviço': 'Gestão de Serviços', 
+        'Compra': 'Gestão de Logística & Compras', 
+        'Calibração': 'Progresso de Calibrações & Certificados'
+    };
+    document.getElementById('pageTitle').innerText = titulos[tipo];
+    
+    const isCalib = (tipo === 'Calibração');
+    document.getElementById('kpiGrid').style.display = isCalib ? 'none' : 'grid';
+    document.getElementById('tableContainer').style.display = isCalib ? 'none' : 'block';
+    document.getElementById('calibracaoContainer').style.display = isCalib ? 'grid' : 'none';
+
+    document.getElementById('statusFilter').value = 'Todos'; 
+    popularFiltroStatus(); 
+    atualizarPainel();
+}
+
+buscarDados();
+setInterval(buscarDados, 60000);
