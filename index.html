@@ -28,12 +28,32 @@
     <main class="main-content">
         <div class="header">
             <h1 id="pageTitle">Gestão de Serviços</h1>
+            
             <div class="header-actions">
-                <select id="statusFilter" onchange="atualizarPainel()">
-                    <option value="Todos">Todos os Status</option>
-                </select>
-                <button id="btnSync" class="btn-sync" onclick="forcarSincronizacao()">
-                    <i class="fa-solid fa-arrows-rotate" id="syncIcon"></i> Atualizar
+                <div class="filters-container">
+                    <select id="filterSistema" onchange="atualizarPainel()">
+                        <option value="Todos">Todos os Sistemas</option>
+                    </select>
+                    
+                    <select id="statusFilter" onchange="atualizarPainel()">
+                        <option value="Todos">Todos os Status</option>
+                    </select>
+                    
+                    <select id="filterResponsavel" onchange="atualizarPainel()">
+                        <option value="Todos">Responsável</option>
+                    </select>
+                    
+                    <select id="filterEquipe" onchange="atualizarPainel()">
+                        <option value="Todos">Equipe</option>
+                    </select>
+                    
+                    <select id="filterPrioridade" onchange="atualizarPainel()" style="display: none;">
+                        <option value="Todos">Prioridade</option>
+                    </select>
+                </div>
+
+                <button id="btnSync" class="btn-sync" onclick="forcarSincronizacao()" title="Atualizar Dados">
+                    <i class="fa-solid fa-arrows-rotate" id="syncIcon"></i>
                 </button>
             </div>
         </div>
