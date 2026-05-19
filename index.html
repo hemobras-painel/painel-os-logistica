@@ -52,6 +52,15 @@
                     </select>
                 </div>
 
+                <div class="export-group">
+                    <button class="btn-export bg-excel" onclick="exportarParaExcel()" title="Exportar Dados Filtrados para Excel">
+                        <i class="fa-solid fa-file-excel"></i> Excel
+                    </button>
+                    <button class="btn-export bg-pdf" onclick="exportarParaPDF()" title="Gerar Relatório em PDF">
+                        <i class="fa-solid fa-file-pdf"></i> PDF
+                    </button>
+                </div>
+
                 <button id="btnSync" class="btn-sync" onclick="forcarSincronizacao()" title="Atualizar Dados">
                     <i class="fa-solid fa-arrows-rotate" id="syncIcon"></i>
                 </button>

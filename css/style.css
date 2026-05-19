@@ -22,13 +22,22 @@ body { font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 20px; flex-wrap: wrap; }
 .header h1 { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; white-space: nowrap; }
 
-/* === NOVA ORGANIZAÇÃO DOS FILTROS E BOTÕES === */
+/* === FILTROS E AÇÕES === */
 .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
 .filters-container { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); font-family: 'Inter'; font-size: 12px; font-weight: 500; color: var(--text); cursor: pointer; outline: none; background: white; max-width: 160px; text-overflow: ellipsis; }
 select:hover { border-color: #94a3b8; }
 .btn-sync { background: var(--primary); color: white; border: none; width: 35px; height: 35px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
 .btn-sync:hover { background: #2563eb; transform: rotate(15deg); }
+
+/* === NOVOS BOTÕES DE EXPORTAR === */
+.export-group { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-export { border: none; padding: 8px 14px; border-radius: 8px; font-family: 'Inter'; font-size: 12px; font-weight: 600; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.btn-export:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.bg-excel { background-color: #16a34a; }
+.bg-excel:hover { background-color: #15803d; }
+.bg-pdf { background-color: #dc2626; }
+.bg-pdf:hover { background-color: #b91c1c; }
 
 /* === CARTÕES (KPIs) === */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
@@ -49,7 +58,7 @@ th { text-align: left; padding: 12px 10px; font-size: 11px; color: #64748b; bord
 td { padding: 12px 10px; font-size: 12px; border-bottom: 1px solid var(--border); transition: background-color 0.2s; }
 tr:hover td { background-color: #f1f5f9; } 
 
-/* === ETIQUETAS DE CORES (BADGES) === */
+/* === BADGES === */
 .badge { padding: 4px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; width: fit-content; }
 .bg-padrao { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 .bg-solicitado { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
@@ -59,7 +68,7 @@ tr:hover td { background-color: #f1f5f9; }
 .bg-transito { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
 .bg-concluido { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
 
-/* === BARRAS DE PROGRESSO (CALIBRAÇÃO) === */
+/* === CALIBRAÇÃO === */
 .calibracao-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 .prog-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s ease; }
 .prog-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.08); }
@@ -71,9 +80,45 @@ tr:hover td { background-color: #f1f5f9; }
 .prog-details { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
 .cert-stats { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* === BOTÃO DE ANEXO / FOTO === */
 .btn-anexo { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 3px 8px; background-color: #f1f5f9; color: #475569; font-size: 10px; font-weight: 600; text-decoration: none; border-radius: 6px; border: 1px solid #cbd5e1; transition: all 0.2s; }
 .btn-anexo:hover { background-color: #e2e8f0; color: #0f172a; border-color: #94a3b8; }
+
+/* ==========================================
+   🚨 REGRAS INTELIGENTES DE IMPRESSÃO (PDF)
+   ========================================== */
+@media print {
+    /* Esconde elementos puramente interativos da tela */
+    .sidebar, .header-actions, .btn-anexo, .btn-sync, .export-group, select { 
+        display: none !important; 
+    }
+    /* Expande a área de conteúdo para ocupar a folha A4 inteira */
+    body { 
+        background: white; 
+        color: black; 
+        overflow: visible; 
+        height: auto; 
+    }
+    .main-content { 
+        padding: 0; 
+        overflow: visible; 
+        height: auto; 
+        width: 100%;
+    }
+    .table-container { 
+        box-shadow: none; 
+        border: 1px solid #cbd5e1; 
+        overflow: visible; 
+    }
+    /* Impede que gráficos ou cartões fiquem cortados no meio da folha */
+    .kpi-card, .chart-card, .prog-card, tr { 
+        page-break-inside: avoid; 
+        box-shadow: none !important; 
+        border: 1px solid #cbd5e1 !important;
+    }
+    table { 
+        page-break-inside: auto; 
+    }
+}
 
 /* === ANIMAÇÕES === */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

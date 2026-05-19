@@ -61,7 +61,7 @@ async function buscarDados() {
         document.getElementById('connIndicator').className = 'status-dot online';
         document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
         
-        popularTodosOsFiltros(); // Atualiza todas as caixas de seleção
+        popularTodosOsFiltros(); 
         atualizarPainel();
     } catch (erro) {
         console.error("Erro de conexão:", erro);
@@ -70,9 +70,7 @@ async function buscarDados() {
     }
 }
 
-// === CÉREBRO DOS FILTROS COMBINADOS ===
 function popularTodosOsFiltros() {
-    // 1. Isola os dados da aba ativa para coletar as opções
     const dadosAba = todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
         if (abaAtual === 'Serviço' && abaPlanilha.includes('SERVI')) return true;
@@ -81,30 +79,22 @@ function popularTodosOsFiltros() {
         return false;
     });
 
-    // Função auxiliar para preencher um select mantendo a escolha atual
     const preencherSelect = (idSelect, listaValores, labelPadrao) => {
         const select = document.getElementById(idSelect);
         if (!select) return;
         const valorAtual = select.value;
-        
         const unicos = [...new Set(listaValores)].filter(v => v !== '' && v !== '-').sort();
-        
         select.innerHTML = `<option value="Todos">${labelPadrao}</option>`;
-        unicos.forEach(val => {
-            select.innerHTML += `<option value="${val}">${val}</option>`;
-        });
-        
+        unicos.forEach(val => { select.innerHTML += `<option value="${val}">${val}</option>`; });
         if (unicos.includes(valorAtual)) select.value = valorAtual;
     };
 
-    // Coleta as listas de valores únicos
     const sistemas = dadosAba.map(d => pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']));
     const status = dadosAba.map(d => d.Status ? d.Status.trim() : '');
     const responsaveis = dadosAba.map(d => pegarValor(d, ['Responsável', 'Solicitante']));
     const equipes = dadosAba.map(d => pegarValor(d, ['Equipe', 'Time', 'Grupo']));
     const prioridades = dadosAba.map(d => pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']));
 
-    // Preenche cada caixa
     preencherSelect('filterSistema', sistemas, 'Todos os Sistemas');
     preencherSelect('statusFilter', status, 'Todos os Status');
     preencherSelect('filterResponsavel', responsaveis, abaAtual === 'Compra' ? 'Todos Solicitantes' : 'Todos Responsáveis');
@@ -112,18 +102,16 @@ function popularTodosOsFiltros() {
     preencherSelect('filterPrioridade', prioridades, 'Todas Prioridades');
 }
 
-function atualizarPainel() {
-    // Captura o valor escolhido em cada uma das caixinhas
+// Retorna os dados que estão passando pelos filtros selecionados no momento
+function obterDadosFiltradosAtuais() {
     const fSistema = document.getElementById('filterSistema')?.value || 'Todos';
     const fStatus = document.getElementById('statusFilter')?.value || 'Todos';
     const fResp = document.getElementById('filterResponsavel')?.value || 'Todos';
     const fEquipe = document.getElementById('filterEquipe')?.value || 'Todos';
     const fPrioridade = document.getElementById('filterPrioridade')?.value || 'Todos';
 
-    const filtrados = todosDados.filter(d => {
+    return todosDados.filter(d => {
         const abaPlanilha = String(d.AbaOrigem || '').toUpperCase().trim();
-
-        // Verifica a Aba
         let pertenceAAba = false;
         if (abaAtual === 'Serviço' && abaPlanilha.includes('SERVI')) pertenceAAba = true;
         else if (abaAtual === 'Compra' && (abaPlanilha.includes('COMPRA') || abaPlanilha.includes('LOGISTICA'))) pertenceAAba = true;
@@ -131,24 +119,23 @@ function atualizarPainel() {
 
         if (!pertenceAAba) return false;
 
-        // Puxa os valores da linha atual para comparar com os filtros
         const sys = pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']);
         const st = d.Status ? d.Status.trim() : '';
         const rsp = pegarValor(d, ['Responsável', 'Solicitante']);
         const eqp = pegarValor(d, ['Equipe', 'Time', 'Grupo']);
         const prio = pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']);
 
-        // Aplica o EFEITO CASCATA (Só passa se atender a todos os critérios selecionados)
-        const passaSistema = (fSistema === 'Todos' || sys === fSistema);
-        const passaStatus = (fStatus === 'Todos' || st === fStatus);
-        const passaResp = (fResp === 'Todos' || rsp === fResp);
-        const passaEquipe = (fEquipe === 'Todos' || eqp === fEquipe);
-        const passaPrio = (fPrioridade === 'Todos' || prio === fPrioridade);
-
-        return passaSistema && passaStatus && passaResp && passaEquipe && passaPrio;
+        return (fSistema === 'Todos' || sys === fSistema) &&
+               (fStatus === 'Todos' || st === fStatus) &&
+               (fResp === 'Todos' || rsp === fResp) &&
+               (fEquipe === 'Todos' || eqp === fEquipe) &&
+               (fPrioridade === 'Todos' || prio === fPrioridade);
     });
+}
+
+function atualizarPainel() {
+    const filtrados = obterDadosFiltradosAtuais();
     
-    // Atualiza a tela com o resultado cruzado
     if (abaAtual === 'Calibração') {
         renderizarCalibracoes(filtrados);
         renderizarGraficos(filtrados);
@@ -159,7 +146,6 @@ function atualizarPainel() {
     }
 }
 
-// Função de Gestão de Interface (Mostra/Esconde filtros conforme a tela ativa)
 function ajustarVisibilidadeDosFiltros() {
     const boxResp = document.getElementById('filterResponsavel');
     const boxEquipe = document.getElementById('filterEquipe');
@@ -169,24 +155,22 @@ function ajustarVisibilidadeDosFiltros() {
 
     if (!boxResp || !boxEquipe || !boxPrio) return;
 
-    // Reseta visualização padrão
     boxSistema.style.display = 'inline-block';
     boxStatus.style.display = 'inline-block';
 
     if (abaAtual === 'Serviço') {
         boxResp.style.display = 'inline-block';
         boxEquipe.style.display = 'inline-block';
-        boxPrio.style.display = 'none'; // OS não tem prioridade
+        boxPrio.style.display = 'none';
     } else if (abaAtual === 'Compra') {
-        boxResp.style.display = 'inline-block'; // Na compra vira Solicitante
-        boxEquipe.style.display = 'none';       // Compra não tem equipe técnica
-        boxPrio.style.display = 'inline-block'; // Mostra filtro de Prioridade
+        boxResp.style.display = 'inline-block';
+        boxEquipe.style.display = 'none';
+        boxPrio.style.display = 'inline-block';
     } else if (abaAtual === 'Calibração') {
-        // Calibração consolidada foca no Sistema
         boxResp.style.display = 'none';
         boxEquipe.style.display = 'none';
         boxPrio.style.display = 'none';
-        boxStatus.style.display = 'none'; // O progresso já exibe tudo consolidado
+        boxStatus.style.display = 'none';
     }
 }
 
@@ -200,11 +184,7 @@ function mudarAba(tipo) {
         if (tipo === 'Calibração' && btn.innerText.includes('Calibrações')) btn.classList.add('active');
     });
 
-    const titulos = { 
-        'Serviço': 'Gestão de Serviços', 
-        'Compra': 'Gestão de Logística & Compras', 
-        'Calibração': 'Progresso de Calibrações & Certificados'
-    };
+    const titulos = { 'Serviço': 'Gestão de Serviços', 'Compra': 'Gestão de Logística & Compras', 'Calibração': 'Progresso de Calibrações & Certificados' };
     document.getElementById('pageTitle').innerText = titulos[tipo];
     
     const isCalib = (tipo === 'Calibração');
@@ -212,7 +192,6 @@ function mudarAba(tipo) {
     document.getElementById('tableContainer').style.display = isCalib ? 'none' : 'block';
     document.getElementById('calibracaoContainer').style.display = isCalib ? 'grid' : 'none';
 
-    // Reseta todos os filtros ao trocar de tela para não causar confusão
     document.querySelectorAll('.filters-container select').forEach(s => s.value = 'Todos');
 
     ajustarVisibilidadeDosFiltros();
@@ -354,6 +333,92 @@ function renderizarKPIs(lista) {
     const grid = document.getElementById('kpiGrid'); const total = lista.length;
     const concs = lista.filter(d => String(d.Status || '').toLowerCase().match(/conclu|entregue|realizada|certificado aprovado|aprovado/)).length;
     grid.innerHTML = `<div class="kpi-card"><div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Filtrado</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total - concs}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concs}</p></div></div>`;
+}
+
+// ==========================================
+// 🚀 NOVAS FUNÇÕES DE EXPORTAR (EXCEL E PDF)
+// ==========================================
+function exportarParaPDF() {
+    window.print(); // Dispara o motor de impressão nativo com o CSS ocultando o desnecessário
+}
+
+function exportarParaExcel() {
+    const dadosFiltrados = obterDadosFiltradosAtuais();
+    if(dadosFiltrados.length === 0) {
+        alert("Não há dados na tela para exportar!");
+        return;
+    }
+
+    let csvContent = "";
+    let headers = [];
+
+    // Define os cabeçalhos das colunas com base na aba ativa
+    if (abaAtual === 'Calibração') {
+        headers = ["Sistema", "Total", "Calibrados", "Certificados Aprovados", "Certificados Pendentes"];
+        csvContent += headers.join(";") + "\n";
+        dadosFiltrados.forEach(d => {
+            const linha = [
+                `"${pegarValor(d, ['Sistema', 'Sistema/quadro'])}"`,
+                `"${parseInt(pegarValor(d, ['Total'])) || 0}"`,
+                `"${parseInt(pegarValor(d, ['Calibrados'])) || 0}"`,
+                `"${parseInt(pegarValor(d, ['Certificados Aprovados'])) || 0}"`,
+                `"${parseInt(pegarValor(d, ['Certificados Pendentes'])) || 0}"`
+            ];
+            csvContent += linha.join(";") + "\n";
+        });
+    } else if (abaAtual === 'Compra') {
+        headers = ["Nº", "Descrição do Item", "Qtd Solicitada", "Prioridade", "Solicitante", "Status", "Sistema/Quadro", "O.S Vinculada", "Solicitado Data", "Cotação Data", "Aprovado Data", "Previsão", "Entregue"];
+        csvContent += headers.join(";") + "\n";
+        dadosFiltrados.forEach(d => {
+            const linha = [
+                `"${d['Nº'] || d['Nº OS'] || '-'}"`,
+                `"${pegarValor(d, ['Descrição do item', 'Descrição']).replace(/"/g, '""')}"`,
+                `"${pegarValor(d, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd'])}"`,
+                `"${pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade'])}"`,
+                `"${pegarValor(d, ['Solicitante'])}"`,
+                `"${d.Status || ''}"`,
+                `"${pegarValor(d, ['Sistema/quadro', 'Sistema'])}"`,
+                `"${pegarValor(d, ['O.S Vinculada', 'OS Relacionada'])}"`,
+                `"${formatarData(pegarValor(d, ['Solicitado? Data', 'Data de solicitação']))}"`,
+                `"${formatarData(pegarValor(d, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB']))}"`,
+                `"${formatarData(pegarValor(d, ['Aprovado HB? Data', 'Aprovado HB']))}"`,
+                `"${formatarData(pegarValor(d, ['Previsão de Entrega', 'Previsão']))}"`,
+                `"${formatarData(pegarValor(d, ['Data Entregue', 'Data de entrega no Site']))}"`
+            ];
+            csvContent += linha.join(";") + "\n";
+        });
+    } else {
+        // Serviços
+        headers = ["Nº OS", "Descrição", "Local", "Sistema", "Status", "Responsável", "Equipe", "Data Abertura", "Data Conclusão", "Observações"];
+        csvContent += headers.join(";") + "\n";
+        dadosFiltrados.forEach(d => {
+            const linha = [
+                `"${d['Nº OS'] || d['Nº'] || '-'}"`,
+                `"${pegarValor(d, ['Descrição do Serviço', 'Descrição']).replace(/"/g, '""')}"`,
+                `"${d.Local || '-'}"`,
+                `"${pegarValor(d, ['Sistema', 'Tipo de Sistema'])}"`,
+                `"${d.Status || ''}"`,
+                `"${d.Responsável || '-'}"`,
+                `"${pegarValor(d, ['Equipe', 'Time', 'Grupo'])}"`,
+                `"${formatarData(pegarValor(d, ['Data de Abertura', 'Data']))}"`,
+                `"${formatarData(pegarValor(d, ['Data de Conclusão', 'Conclusão']))}"`,
+                `"${(d.Observações || '').replace(/"/g, '""')}"`
+            ];
+            csvContent += linha.join(";") + "\n";
+        });
+    }
+
+    // 🧮 O truque de mestre: Adiciona o caractere BOM UTF-8 (\uFEFF) no início para o Excel ler o português perfeito
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Relatorio_${abaAtual}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 ajustarVisibilidadeDosFiltros();
