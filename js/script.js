@@ -102,7 +102,6 @@ function popularTodosOsFiltros() {
     preencherSelect('filterPrioridade', prioridades, 'Todas Prioridades');
 }
 
-// Retorna os dados que estão passando pelos filtros selecionados no momento
 function obterDadosFiltradosAtuais() {
     const fSistema = document.getElementById('filterSistema')?.value || 'Todos';
     const fStatus = document.getElementById('statusFilter')?.value || 'Todos';
@@ -291,8 +290,11 @@ function renderizarTabela(lista) {
     if(lista.length === 0) {
         head.innerHTML = ''; body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:#64748b; font-weight: 500;">Nenhum registro encontrado para os filtros aplicados.</td></tr>'; return;
     }
+    
     if (abaAtual === 'Compra') {
-        head.innerHTML = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação</th><th title="Aprovado HB">Aprovado</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
+        // AQUI ESTÃO OS DOIS NOMES ATUALIZADOS QUE VOCÊ PEDIU
+        head.innerHTML = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação Enviada HB</th><th title="Aprovado HB">Aprovado HB</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
+        
         body.innerHTML = lista.map(item => {
             const conf = obterConfigStatus(item.Status); const num = item['Nº'] || item['Nº OS'] || '-';
             const desc = pegarValor(item, ['Descrição do item', 'Descrição']); const qtd = pegarValor(item, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd']);
@@ -335,11 +337,8 @@ function renderizarKPIs(lista) {
     grid.innerHTML = `<div class="kpi-card"><div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Filtrado</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total - concs}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concs}</p></div></div>`;
 }
 
-// ==========================================
-// 🚀 NOVAS FUNÇÕES DE EXPORTAR (EXCEL E PDF)
-// ==========================================
 function exportarParaPDF() {
-    window.print(); // Dispara o motor de impressão nativo com o CSS ocultando o desnecessário
+    window.print(); 
 }
 
 function exportarParaExcel() {
@@ -352,7 +351,6 @@ function exportarParaExcel() {
     let csvContent = "";
     let headers = [];
 
-    // Define os cabeçalhos das colunas com base na aba ativa
     if (abaAtual === 'Calibração') {
         headers = ["Sistema", "Total", "Calibrados", "Certificados Aprovados", "Certificados Pendentes"];
         csvContent += headers.join(";") + "\n";
@@ -367,7 +365,8 @@ function exportarParaExcel() {
             csvContent += linha.join(";") + "\n";
         });
     } else if (abaAtual === 'Compra') {
-        headers = ["Nº", "Descrição do Item", "Qtd Solicitada", "Prioridade", "Solicitante", "Status", "Sistema/Quadro", "O.S Vinculada", "Solicitado Data", "Cotação Data", "Aprovado Data", "Previsão", "Entregue"];
+        // Atualizado para o Excel baixar com os mesmos nomes novos
+        headers = ["Nº", "Descrição do Item", "Qtd Solicitada", "Prioridade", "Solicitante", "Status", "Sistema/Quadro", "O.S Vinculada", "Solicitado Data", "Cotação Enviada HB Data", "Aprovado HB Data", "Previsão", "Entregue"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
             const linha = [
@@ -388,7 +387,6 @@ function exportarParaExcel() {
             csvContent += linha.join(";") + "\n";
         });
     } else {
-        // Serviços
         headers = ["Nº OS", "Descrição", "Local", "Sistema", "Status", "Responsável", "Equipe", "Data Abertura", "Data Conclusão", "Observações"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
@@ -408,7 +406,6 @@ function exportarParaExcel() {
         });
     }
 
-    // 🧮 O truque de mestre: Adiciona o caractere BOM UTF-8 (\uFEFF) no início para o Excel ler o português perfeito
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
