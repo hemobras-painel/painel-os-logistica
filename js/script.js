@@ -22,23 +22,30 @@ function formatarData(dataOriginal) {
     return dataOriginal; 
 }
 
+// 🎨 NOVO MOTOR DE CORES: Treinado para as palavras exatas da sua planilha
 function obterConfigStatus(statusReal) {
     const s = String(statusReal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     
-    if (s.includes('certificado aprovado')) return { icone: 'fa-certificate', classe: 'bg-concluido' };
-    if (s.includes('aguardando certificado')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
-
-    if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
+    // Status Concluídos (Verde)
+    if (s.includes('servico concluido') || s.includes('certificado aprovado') || s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada') || s.includes('aprovado')) {
+        return { icone: 'fa-check-double', classe: 'bg-concluido' };
+    }
+    // Status Iniciais (Azul)
+    if (s.includes('o.s aberta') || s.includes('os aberta') || s.includes('solicitado') || s.includes('aberta') || s.includes('servico iniciado') || s.includes('iniciado')) {
+        return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
+    }
+    // Status de Alerta/Espera (Laranja)
+    if (s.includes('aguardando') || s.includes('manutencao') || s.includes('pendente') || s.includes('andamento') || s.includes('aprovacao')) {
+        return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
+    }
+    // Outros Status
     if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
-    if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente') || s.includes('andamento')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
-    if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
     if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
-    if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
     
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
-// Limpa acentos e espaços invisíveis para o código nunca perder uma coluna
+// Caçador de Colunas (Ignora acentos e maiúsculas/minúsculas)
 function pegarValor(item, nomesPossiveis) {
     for (let nome of nomesPossiveis) {
         const chaveReal = Object.keys(item).find(k => {
@@ -69,18 +76,18 @@ async function buscarDados() {
         
         // 🚀 O MOTOR DE DEDUÇÃO AUTOMÁTICA
         todosDados = dadosBrutos.map(d => {
+            // Caça a coluna pelo nome antigo ou novo
             let statusCaçado = pegarValor(d, [
-                'Status', 'Status da OS', 'Status OS', 'Status do Servico',
+                'Status', 'Servico Concluido', 'Status da OS', 'Status OS', 'Status do Servico',
                 'Situacao', 'Status da Certificacao', 'Status Concluido', 'Fase'
             ]);
             
-            // Se o Status estiver vazio na planilha, o sistema deduz pelas datas:
+            // Se o Status ainda estiver vazio, tenta deduzir pela data final
             if (!statusCaçado || statusCaçado === '-' || statusCaçado.trim() === '') {
                 const dataConclusao = pegarValor(d, ['Data de Conclusão', 'Conclusão', 'Data Fim']);
                 
-                // Se tem data finalizada, é sucesso! Se não, está na pista rodando.
                 if (dataConclusao && dataConclusao !== '-' && dataConclusao.trim() !== '') {
-                    statusCaçado = 'Concluído';
+                    statusCaçado = 'Serviço Concluído';
                 } else {
                     statusCaçado = 'Em Andamento';
                 }
@@ -122,7 +129,7 @@ function popularTodosOsFiltros() {
     };
 
     const sistemas = dadosAba.map(d => pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']));
-    const status = dadosAba.map(d => d.Status); // Agora já usa o Status mastigado pela dedução!
+    const status = dadosAba.map(d => d.Status); // Usa o Status caçado
     const responsaveis = dadosAba.map(d => pegarValor(d, ['Responsável', 'Solicitante']));
     const equipes = dadosAba.map(d => pegarValor(d, ['Equipe', 'Time', 'Grupo']));
     const prioridades = dadosAba.map(d => pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']));
