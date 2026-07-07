@@ -38,10 +38,11 @@ function obterConfigStatus(statusReal) {
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
+// Melhoria: Deixa a busca muito mais resistente a espaços e letras minúsculas
 function pegarValor(item, nomesPossiveis) {
     for (let nome of nomesPossiveis) {
         const chaveReal = Object.keys(item).find(k => k.toLowerCase().trim() === nome.toLowerCase().trim());
-        if (chaveReal && item[chaveReal]) return item[chaveReal];
+        if (chaveReal !== undefined && item[chaveReal] !== undefined) return item[chaveReal];
     }
     return '';
 }
@@ -57,7 +58,16 @@ async function buscarDados() {
     try {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Erro na rede');
-        todosDados = await response.json(); 
+        let dadosBrutos = await response.json(); 
+        
+        // 🚀 O NORMALIZADOR: Se a coluna de Status estiver com nomes diferentes ou espaços, ele corrige automaticamente
+        todosDados = dadosBrutos.map(d => {
+            if (d.Status === undefined) {
+                d.Status = pegarValor(d, ['Status', 'Situação', 'Status da OS', 'Status OS', 'Status da O.S', 'Status da Certificação']);
+            }
+            return d;
+        });
+
         document.getElementById('connIndicator').className = 'status-dot online';
         document.getElementById('connText').innerText = `Sincronizado: ${new Date().toLocaleTimeString().slice(0,5)}`;
         
@@ -90,7 +100,7 @@ function popularTodosOsFiltros() {
     };
 
     const sistemas = dadosAba.map(d => pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']));
-    const status = dadosAba.map(d => d.Status ? d.Status.trim() : '');
+    const status = dadosAba.map(d => d.Status ? String(d.Status).trim() : '');
     const responsaveis = dadosAba.map(d => pegarValor(d, ['Responsável', 'Solicitante']));
     const equipes = dadosAba.map(d => pegarValor(d, ['Equipe', 'Time', 'Grupo']));
     const prioridades = dadosAba.map(d => pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']));
@@ -119,7 +129,7 @@ function obterDadosFiltradosAtuais() {
         if (!pertenceAAba) return false;
 
         const sys = pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']);
-        const st = d.Status ? d.Status.trim() : '';
+        const st = d.Status ? String(d.Status).trim() : '';
         const rsp = pegarValor(d, ['Responsável', 'Solicitante']);
         const eqp = pegarValor(d, ['Equipe', 'Time', 'Grupo']);
         const prio = pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']);
@@ -266,7 +276,7 @@ function renderizarGraficos(lista) {
         document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
         document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
         const pends = lista.filter(d => !String(d.Status || '').toLowerCase().match(/conclu|entregue|realizada|aprovado/));
-        const cStatus = {}; pends.forEach(d => { const s = d.Status ? d.Status.trim() : 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
+        const cStatus = {}; pends.forEach(d => { const s = d.Status ? String(d.Status).trim() : 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
         chartStatusInstancia = new Chart(ctxStatus, {
             type: 'doughnut', data: { labels: Object.keys(cStatus), datasets: [{ data: Object.values(cStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: v => v > 0 ? v : '' } } }
@@ -292,7 +302,6 @@ function renderizarTabela(lista) {
     }
     
     if (abaAtual === 'Compra') {
-        // AQUI ESTÃO OS DOIS NOMES ATUALIZADOS QUE VOCÊ PEDIU
         head.innerHTML = `<tr><th style="width: 80px;">Nº / Status</th><th>Descrição do Item</th><th style="text-align:center;">Qtd</th><th>Prioridade</th><th>Solicitante</th><th title="Data de Solicitação">Solicitado</th><th title="Data de Cotação enviada a HB">Cotação Enviada HB</th><th title="Aprovado HB">Aprovado HB</th><th title="Previsão de entrega">Previsão</th><th title="Data de entrega no Site">Entregue</th></tr>`;
         
         body.innerHTML = lista.map(item => {
@@ -313,7 +322,7 @@ function renderizarTabela(lista) {
             const bSys = sys ? `<div style="margin-top: 6px;"><span style="font-size: 9px; font-weight: 600; color: #475569; background: #e2e8f0; padding: 3px 6px; border-radius: 4px;"><i class="fa-solid fa-cube"></i> Sist: ${sys}</span></div>` : '';
             const imgLink = pegarValor(item, ['Anexo', 'Foto', 'Link', 'Link da Foto']);
             const bImg = imgLink ? `<br><a href="${imgLink}" target="_blank" class="btn-anexo"><i class="fa-solid fa-image"></i> Ver Foto</a>` : '';
-            return `<tr><td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${num}</div><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Status Vazio'}</span>${bRef}</td><td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${desc || '-'}${bSys}${bImg}</td><td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td><td style="vertical-align: middle;">${pill}</td><td style="font-size: 12px; font-weight: 500; color: #334155;">${sol || '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtSol !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> `+dtSol : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtCot !== '-' ? `<i class="fa-regular fa-envelope"></i> `+dtCot : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtApr !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> `+dtApr : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrev !== '-' ? `<i class="fa-regular fa-clock"></i> `+dtPrev : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEnt !== '-' ? `<i class="fa-solid fa-box-open"></i> `+dtEnt : '-'}</td></tr>`;
+            return `<tr><td style="vertical-align: top;"><div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #0f172a;">${num}</div><span class="badge ${conf.classe}"><i class="fa-solid ${conf.icone}"></i> ${item.Status || 'Pendente'}</span>${bRef}</td><td style="font-size: 12px; vertical-align: top; max-width: 180px; word-wrap: break-word; color: #334155;">${desc || '-'}${bSys}${bImg}</td><td style="font-size: 13px; font-weight: 700; text-align: center; color: #0f172a;">${qtd || '-'}</td><td style="vertical-align: middle;">${pill}</td><td style="font-size: 12px; font-weight: 500; color: #334155;">${sol || '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtSol !== '-' ? `<i class="fa-regular fa-calendar-plus"></i> `+dtSol : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #64748b;">${dtCot !== '-' ? `<i class="fa-regular fa-envelope"></i> `+dtCot : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #0284c7; font-weight: 500;">${dtApr !== '-' ? `<i class="fa-solid fa-thumbs-up"></i> `+dtApr : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #d97706; font-weight: 500;">${dtPrev !== '-' ? `<i class="fa-regular fa-clock"></i> `+dtPrev : '-'}</td><td style="font-size: 11px; white-space: nowrap; color: #059669; font-weight: 700;">${dtEnt !== '-' ? `<i class="fa-solid fa-box-open"></i> `+dtEnt : '-'}</td></tr>`;
         }).join('');
     } else {
         head.innerHTML = `<tr><th style="width: 90px;">Nº OS / Ref</th><th>Descrição / Local</th><th>Sistema</th><th>Status</th><th>Responsável</th><th>Equipe</th><th>Abertura</th><th>Conclusão</th></tr>`;
@@ -365,7 +374,6 @@ function exportarParaExcel() {
             csvContent += linha.join(";") + "\n";
         });
     } else if (abaAtual === 'Compra') {
-        // Atualizado para o Excel baixar com os mesmos nomes novos
         headers = ["Nº", "Descrição do Item", "Qtd Solicitada", "Prioridade", "Solicitante", "Status", "Sistema/Quadro", "O.S Vinculada", "Solicitado Data", "Cotação Enviada HB Data", "Aprovado HB Data", "Previsão", "Entregue"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
