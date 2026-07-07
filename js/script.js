@@ -38,11 +38,18 @@ function obterConfigStatus(statusReal) {
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
-// Melhoria: Deixa a busca muito mais resistente a espaços e letras minúsculas
+// 🚀 FUNÇÃO AGRESSIVA: Limpa acentos, espaços e maiúsculas para nunca perder uma coluna
 function pegarValor(item, nomesPossiveis) {
     for (let nome of nomesPossiveis) {
-        const chaveReal = Object.keys(item).find(k => k.toLowerCase().trim() === nome.toLowerCase().trim());
-        if (chaveReal !== undefined && item[chaveReal] !== undefined) return item[chaveReal];
+        const chaveReal = Object.keys(item).find(k => {
+            const kLimpo = String(k).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+            const nLimpo = String(nome).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+            return kLimpo === nLimpo;
+        });
+        
+        if (chaveReal !== undefined && item[chaveReal] !== undefined && item[chaveReal] !== null && String(item[chaveReal]).trim() !== '') {
+            return String(item[chaveReal]).trim();
+        }
     }
     return '';
 }
@@ -60,11 +67,18 @@ async function buscarDados() {
         if (!response.ok) throw new Error('Erro na rede');
         let dadosBrutos = await response.json(); 
         
-        // 🚀 O NORMALIZADOR: Se a coluna de Status estiver com nomes diferentes ou espaços, ele corrige automaticamente
+        // 🚀 O NORMALIZADOR DEFINITIVO: Força a sobrescrita do Status mapeando todos os nomes possíveis
         todosDados = dadosBrutos.map(d => {
-            if (d.Status === undefined) {
-                d.Status = pegarValor(d, ['Status', 'Situação', 'Status da OS', 'Status OS', 'Status da O.S', 'Status da Certificação']);
-            }
+            const statusCaçado = pegarValor(d, [
+                'Status', 
+                'Status da Certificacao', // Ignora acentos internamente
+                'Situacao', 
+                'Status da OS', 
+                'Status OS', 
+                'Fase', 
+                'Andamento'
+            ]);
+            d.Status = statusCaçado || '';
             return d;
         });
 
@@ -100,7 +114,7 @@ function popularTodosOsFiltros() {
     };
 
     const sistemas = dadosAba.map(d => pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']));
-    const status = dadosAba.map(d => d.Status ? String(d.Status).trim() : '');
+    const status = dadosAba.map(d => d.Status); // Agora o Status já está tratado e limpo!
     const responsaveis = dadosAba.map(d => pegarValor(d, ['Responsável', 'Solicitante']));
     const equipes = dadosAba.map(d => pegarValor(d, ['Equipe', 'Time', 'Grupo']));
     const prioridades = dadosAba.map(d => pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']));
@@ -129,7 +143,7 @@ function obterDadosFiltradosAtuais() {
         if (!pertenceAAba) return false;
 
         const sys = pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']);
-        const st = d.Status ? String(d.Status).trim() : '';
+        const st = d.Status; // Já tratado
         const rsp = pegarValor(d, ['Responsável', 'Solicitante']);
         const eqp = pegarValor(d, ['Equipe', 'Time', 'Grupo']);
         const prio = pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']);
@@ -276,7 +290,7 @@ function renderizarGraficos(lista) {
         document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
         document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
         const pends = lista.filter(d => !String(d.Status || '').toLowerCase().match(/conclu|entregue|realizada|aprovado/));
-        const cStatus = {}; pends.forEach(d => { const s = d.Status ? String(d.Status).trim() : 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
+        const cStatus = {}; pends.forEach(d => { const s = d.Status || 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
         chartStatusInstancia = new Chart(ctxStatus, {
             type: 'doughnut', data: { labels: Object.keys(cStatus), datasets: [{ data: Object.values(cStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: v => v > 0 ? v : '' } } }
