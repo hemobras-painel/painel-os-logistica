@@ -30,7 +30,7 @@ function obterConfigStatus(statusReal) {
 
     if (s.includes('solicitado') || s.includes('aberta')) return { icone: 'fa-hand-pointer', classe: 'bg-solicitado' };
     if (s.includes('cotacao')) return { icone: 'fa-file-invoice-dollar', classe: 'bg-cotacao' };
-    if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
+    if (s.includes('aguardando') || s.includes('aprovacao') || s.includes('iniciado') || s.includes('manutencao') || s.includes('pendente') || s.includes('andamento')) return { icone: 'fa-hourglass-half', classe: 'bg-alerta' };
     if (s.includes('aprovado')) return { icone: 'fa-thumbs-up', classe: 'bg-aprovado' };
     if (s.includes('transito') || s.includes('enviada')) return { icone: 'fa-truck-fast', classe: 'bg-transito' };
     if (s.includes('entregue') || s.includes('recebido') || s.includes('concluido') || s.includes('realizada')) return { icone: 'fa-check-double', classe: 'bg-concluido' };
@@ -38,7 +38,7 @@ function obterConfigStatus(statusReal) {
     return { icone: 'fa-circle-dot', classe: 'bg-padrao' };
 }
 
-// 🚀 FUNÇÃO AGRESSIVA: Limpa acentos, espaços e maiúsculas para nunca perder uma coluna
+// Limpa acentos e espaços invisíveis para o código nunca perder uma coluna
 function pegarValor(item, nomesPossiveis) {
     for (let nome of nomesPossiveis) {
         const chaveReal = Object.keys(item).find(k => {
@@ -67,18 +67,26 @@ async function buscarDados() {
         if (!response.ok) throw new Error('Erro na rede');
         let dadosBrutos = await response.json(); 
         
-        // 🚀 O NORMALIZADOR DEFINITIVO: Força a sobrescrita do Status mapeando todos os nomes possíveis
+        // 🚀 O MOTOR DE DEDUÇÃO AUTOMÁTICA
         todosDados = dadosBrutos.map(d => {
-            const statusCaçado = pegarValor(d, [
-                'Status', 
-                'Status da Certificacao', // Ignora acentos internamente
-                'Situacao', 
-                'Status da OS', 
-                'Status OS', 
-                'Fase', 
-                'Andamento'
+            let statusCaçado = pegarValor(d, [
+                'Status', 'Status da OS', 'Status OS', 'Status do Servico',
+                'Situacao', 'Status da Certificacao', 'Status Concluido', 'Fase'
             ]);
-            d.Status = statusCaçado || '';
+            
+            // Se o Status estiver vazio na planilha, o sistema deduz pelas datas:
+            if (!statusCaçado || statusCaçado === '-' || statusCaçado.trim() === '') {
+                const dataConclusao = pegarValor(d, ['Data de Conclusão', 'Conclusão', 'Data Fim']);
+                
+                // Se tem data finalizada, é sucesso! Se não, está na pista rodando.
+                if (dataConclusao && dataConclusao !== '-' && dataConclusao.trim() !== '') {
+                    statusCaçado = 'Concluído';
+                } else {
+                    statusCaçado = 'Em Andamento';
+                }
+            }
+
+            d.Status = statusCaçado;
             return d;
         });
 
@@ -114,7 +122,7 @@ function popularTodosOsFiltros() {
     };
 
     const sistemas = dadosAba.map(d => pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']));
-    const status = dadosAba.map(d => d.Status); // Agora o Status já está tratado e limpo!
+    const status = dadosAba.map(d => d.Status); // Agora já usa o Status mastigado pela dedução!
     const responsaveis = dadosAba.map(d => pegarValor(d, ['Responsável', 'Solicitante']));
     const equipes = dadosAba.map(d => pegarValor(d, ['Equipe', 'Time', 'Grupo']));
     const prioridades = dadosAba.map(d => pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']));
@@ -143,7 +151,7 @@ function obterDadosFiltradosAtuais() {
         if (!pertenceAAba) return false;
 
         const sys = pegarValor(d, ['Sistema', 'Sistema/quadro', 'Tipo de Sistema']);
-        const st = d.Status; // Já tratado
+        const st = d.Status;
         const rsp = pegarValor(d, ['Responsável', 'Solicitante']);
         const eqp = pegarValor(d, ['Equipe', 'Time', 'Grupo']);
         const prio = pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade']);
@@ -290,7 +298,7 @@ function renderizarGraficos(lista) {
         document.getElementById('chartTitlePie').innerText = 'Gargalos da Operação (Por Status)';
         document.getElementById('chartTitleBar').innerText = abaAtual.includes('Compra') ? 'Atrasos por Prioridade Crítica' : 'Pendências por Responsável / Equipe';
         const pends = lista.filter(d => !String(d.Status || '').toLowerCase().match(/conclu|entregue|realizada|aprovado/));
-        const cStatus = {}; pends.forEach(d => { const s = d.Status || 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
+        const cStatus = {}; pends.forEach(d => { const s = d.Status ? String(d.Status).trim() : 'Sem Status'; cStatus[s] = (cStatus[s] || 0) + 1; });
         chartStatusInstancia = new Chart(ctxStatus, {
             type: 'doughnut', data: { labels: Object.keys(cStatus), datasets: [{ data: Object.values(cStatus), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'], borderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 14, family: 'Inter' }, formatter: v => v > 0 ? v : '' } } }
@@ -360,84 +368,40 @@ function renderizarKPIs(lista) {
     grid.innerHTML = `<div class="kpi-card"><div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-layer-group"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Filtrado</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-spinner"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Em Andamento</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${total - concs}</p></div></div><div class="kpi-card"><div class="kpi-icon" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-check-double"></i></div><div><h3 style="margin:0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Finalizados</h3><p style="margin:0; font-size: 24px; font-weight: 800; color: #0f172a;">${concs}</p></div></div>`;
 }
 
-function exportarParaPDF() {
-    window.print(); 
-}
+function exportarParaPDF() { window.print(); }
 
 function exportarParaExcel() {
     const dadosFiltrados = obterDadosFiltradosAtuais();
-    if(dadosFiltrados.length === 0) {
-        alert("Não há dados na tela para exportar!");
-        return;
-    }
-
-    let csvContent = "";
-    let headers = [];
+    if(dadosFiltrados.length === 0) { alert("Não há dados na tela para exportar!"); return; }
+    let csvContent = ""; let headers = [];
 
     if (abaAtual === 'Calibração') {
         headers = ["Sistema", "Total", "Calibrados", "Certificados Aprovados", "Certificados Pendentes"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
-            const linha = [
-                `"${pegarValor(d, ['Sistema', 'Sistema/quadro'])}"`,
-                `"${parseInt(pegarValor(d, ['Total'])) || 0}"`,
-                `"${parseInt(pegarValor(d, ['Calibrados'])) || 0}"`,
-                `"${parseInt(pegarValor(d, ['Certificados Aprovados'])) || 0}"`,
-                `"${parseInt(pegarValor(d, ['Certificados Pendentes'])) || 0}"`
-            ];
+            const linha = [ `"${pegarValor(d, ['Sistema', 'Sistema/quadro'])}"`, `"${parseInt(pegarValor(d, ['Total'])) || 0}"`, `"${parseInt(pegarValor(d, ['Calibrados'])) || 0}"`, `"${parseInt(pegarValor(d, ['Certificados Aprovados'])) || 0}"`, `"${parseInt(pegarValor(d, ['Certificados Pendentes'])) || 0}"` ];
             csvContent += linha.join(";") + "\n";
         });
     } else if (abaAtual === 'Compra') {
         headers = ["Nº", "Descrição do Item", "Qtd Solicitada", "Prioridade", "Solicitante", "Status", "Sistema/Quadro", "O.S Vinculada", "Solicitado Data", "Cotação Enviada HB Data", "Aprovado HB Data", "Previsão", "Entregue"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
-            const linha = [
-                `"${d['Nº'] || d['Nº OS'] || '-'}"`,
-                `"${pegarValor(d, ['Descrição do item', 'Descrição']).replace(/"/g, '""')}"`,
-                `"${pegarValor(d, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd'])}"`,
-                `"${pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade'])}"`,
-                `"${pegarValor(d, ['Solicitante'])}"`,
-                `"${d.Status || ''}"`,
-                `"${pegarValor(d, ['Sistema/quadro', 'Sistema'])}"`,
-                `"${pegarValor(d, ['O.S Vinculada', 'OS Relacionada'])}"`,
-                `"${formatarData(pegarValor(d, ['Solicitado? Data', 'Data de solicitação']))}"`,
-                `"${formatarData(pegarValor(d, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB']))}"`,
-                `"${formatarData(pegarValor(d, ['Aprovado HB? Data', 'Aprovado HB']))}"`,
-                `"${formatarData(pegarValor(d, ['Previsão de Entrega', 'Previsão']))}"`,
-                `"${formatarData(pegarValor(d, ['Data Entregue', 'Data de entrega no Site']))}"`
-            ];
+            const linha = [ `"${d['Nº'] || d['Nº OS'] || '-'}"`, `"${pegarValor(d, ['Descrição do item', 'Descrição']).replace(/"/g, '""')}"`, `"${pegarValor(d, ['Qtd Solicitada', 'Qtde. Solicitada', 'Qtd'])}"`, `"${pegarValor(d, ['Prioridade (alta/média/baixa)', 'Prioridade'])}"`, `"${pegarValor(d, ['Solicitante'])}"`, `"${d.Status || ''}"`, `"${pegarValor(d, ['Sistema/quadro', 'Sistema'])}"`, `"${pegarValor(d, ['O.S Vinculada', 'OS Relacionada'])}"`, `"${formatarData(pegarValor(d, ['Solicitado? Data', 'Data de solicitação']))}"`, `"${formatarData(pegarValor(d, ['Cotação enviada HB? Data', 'Data de Cotação enviada a HB']))}"`, `"${formatarData(pegarValor(d, ['Aprovado HB? Data', 'Aprovado HB']))}"`, `"${formatarData(pegarValor(d, ['Previsão de Entrega', 'Previsão']))}"`, `"${formatarData(pegarValor(d, ['Data Entregue', 'Data de entrega no Site']))}"` ];
             csvContent += linha.join(";") + "\n";
         });
     } else {
         headers = ["Nº OS", "Descrição", "Local", "Sistema", "Status", "Responsável", "Equipe", "Data Abertura", "Data Conclusão", "Observações"];
         csvContent += headers.join(";") + "\n";
         dadosFiltrados.forEach(d => {
-            const linha = [
-                `"${d['Nº OS'] || d['Nº'] || '-'}"`,
-                `"${pegarValor(d, ['Descrição do Serviço', 'Descrição']).replace(/"/g, '""')}"`,
-                `"${d.Local || '-'}"`,
-                `"${pegarValor(d, ['Sistema', 'Tipo de Sistema'])}"`,
-                `"${d.Status || ''}"`,
-                `"${d.Responsável || '-'}"`,
-                `"${pegarValor(d, ['Equipe', 'Time', 'Grupo'])}"`,
-                `"${formatarData(pegarValor(d, ['Data de Abertura', 'Data']))}"`,
-                `"${formatarData(pegarValor(d, ['Data de Conclusão', 'Conclusão']))}"`,
-                `"${(d.Observações || '').replace(/"/g, '""')}"`
-            ];
+            const linha = [ `"${d['Nº OS'] || d['Nº'] || '-'}"`, `"${pegarValor(d, ['Descrição do Serviço', 'Descrição']).replace(/"/g, '""')}"`, `"${d.Local || '-'}"`, `"${pegarValor(d, ['Sistema', 'Tipo de Sistema'])}"`, `"${d.Status || ''}"`, `"${d.Responsável || '-'}"`, `"${pegarValor(d, ['Equipe', 'Time', 'Grupo'])}"`, `"${formatarData(pegarValor(d, ['Data de Abertura', 'Data']))}"`, `"${formatarData(pegarValor(d, ['Data de Conclusão', 'Conclusão']))}"`, `"${(d.Observações || '').replace(/"/g, '""')}"` ];
             csvContent += linha.join(";") + "\n";
         });
     }
 
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Relatorio_${abaAtual}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const link = document.createElement("a"); const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url); link.setAttribute("download", `Relatorio_${abaAtual}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
+    link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
 ajustarVisibilidadeDosFiltros();
